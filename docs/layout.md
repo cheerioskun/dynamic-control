@@ -27,10 +27,10 @@ bench/
   CMakeLists.txt                 Google Benchmark and one three-path executable
   bench.cc                       shared benchmark loop and untimed setup
   targets.cc                     noinline target functions in a separate TU
-  run.py                         build/run cases and save JSON plus provenance
+  run.py                         run cases and save JSON plus provenance
   README.md                      commands and interpretation
   RESULTS.md                     first sanity measurements
-  results/sanity-macos-arm64.json compact saved samples and source hashes
+  results/sanity-*.json           saved samples and source hashes per platform
 tests/
   runtime.cc                     handwritten ABI/runtime check
   smoke.cc                       compiler-generated dispatch and permit accounting
