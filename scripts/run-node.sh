@@ -46,6 +46,11 @@ phase compiler
 export DC_BUILD_JOBS=${DC_BUILD_JOBS:-4}
 ./scripts/build-llvm.sh -DLLVM_USE_LINKER=lld \
     -DCLANG_ENABLE_STATIC_ANALYZER=OFF -DCLANG_ENABLE_ARCMT=OFF
+# Match the host g++ installation rather than auto-selecting a newer, possibly
+# incomplete GCC directory. Keep this configuration local to the built compiler.
+gcc_dir=$(dirname "$(g++ -print-libgcc-file-name)")
+printf '%s\n' "--gcc-install-dir=$gcc_dir" >build/llvm/bin/clang++.cfg
+cp build/llvm/bin/clang++.cfg "$run_dir/clang++.cfg"
 
 phase sanity
 make test

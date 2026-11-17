@@ -40,11 +40,11 @@ unannotated function in the same binary.
 
 ## Detached Linux node run
 
-From a checkout on the node, with Clang, CMake, Ninja, LLD, Git, and Python:
+From a checkout on the node, with GCC/G++, CMake, Ninja, LLD, Git, and Python:
 
 ```sh
 mkdir -p build/node-runs/first
-nohup setsid env CC=clang CXX=clang++ DC_BUILD_JOBS=4 DC_BENCH_CPU=2 \
+nohup setsid env CC=gcc CXX=g++ DC_BUILD_JOBS=4 DC_BENCH_CPU=2 \
   bash scripts/run-node.sh "$PWD/build/node-runs/first" \
   >build/node-runs/first/launcher.log 2>&1 </dev/null &
 ```
@@ -54,3 +54,4 @@ runs sanity checks, builds the fixture, saves disassembly, then measures on the
 chosen CPU. It uses seven randomized blocks with at least 0.5 seconds per sample.
 The run directory holds `run.log`, `pid`, `phase`, `exit-code`, and `.done` on
 success or `.failed` on failure. Raw benchmark data is under `results/`.
+The built Clang uses a local `clang++.cfg` to select the host G++ library directory.
