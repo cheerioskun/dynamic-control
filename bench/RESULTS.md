@@ -1,5 +1,48 @@
 # Prototype sanity measurements
 
+## Synthetic Svalinn msem
+
+2026-11-17. The [portable Svalinn controller](../runtime/msem_mock.md) replaces
+the empty hooks. Each acquire/release reads the real steady clock, and the
+controller runs every 3 ms with synthetic bandwidth. Gaussian samples are
+initialized before timing. Entry always succeeds; no permit accounting or locks.
+
+Same three-path arithmetic fixture, LLVM 23.1.6 patch, and Google Benchmark
+v1.10.0. Seven randomized blocks, one process per case. Xeon: CPU 2, minimum
+0.5 s per sample, GCC 13.3 harness/runtime. M5: minimum 0.2 s, Apple Clang 21
+harness/runtime. CPU scaling and ASLR were left enabled on the Xeon.
+
+| Machine | Path | Median CPU ns/call | Min–max CPU ns/call |
+|---|---|---:|---:|
+| Xeon E5530 | Baseline | 2.263 | 2.263–2.264 |
+| Xeon E5530 | Unhooked | 3.395 | 3.394–3.412 |
+| Xeon E5530 | Hooked | 74.729 | 73.197–77.837 |
+| Apple M5 | Baseline | 1.358 | 1.356–1.466 |
+| Apple M5 | Unhooked | 1.059 | 0.769–1.376 |
+| Apple M5 | Hooked | 28.474 | 28.340–28.870 |
+
+Hooked minus unhooked is **71.334 ns/call on the Xeon** and **27.415 ns/call on
+the M5**, between medians. These include two clock checks and amortized controller
+work. M5 unhooked variance still leaves its dispatch penalty unresolved. The
+Xeon's unhooked-minus-baseline difference is 1.132 ns in this build; the changed
+baseline and unhooked values mean comparisons with the earlier binary also
+include code layout and run conditions.
+
+The linked binaries retain the dispatcher, guard, clock checks, and controller
+calculations. On x86, both hooks call `update_capacity`; it calls
+`steady_clock::now`, branches on elapsed time, and retains reward updates,
+random sampling, and softmax exponentiation. The node's runtime, compiler, and
+patch-replay checks all passed. The detached run completed with `.done`, exit 0.
+
+Saved samples and provenance:
+[Xeon](results/synthetic-msem-linux-x86_64.json),
+[M5](results/synthetic-msem-macos-arm64.json).
+Raw artifacts remain under `build/node-runs/20261117T214122Z-msem/` on the node
+and locally, and `build/bench/results/msem-macos-arm64-20261117/` on the Mac.
+The node's new binary is `build/bench/dc_bench`, with a frozen copy in its run
+directory. The previous empty-hook binary is preserved in
+`build/node-runs/20261117T190149Z/dc_bench`; its SHA-256 matches the saved results.
+
 ## Empty hooks: Xeon E5530, Linux x86_64
 
 2026-11-17, Intel Xeon E5530 @ 2.40 GHz (Nehalem), four cores/eight threads.

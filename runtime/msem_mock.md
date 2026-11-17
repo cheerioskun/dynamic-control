@@ -4,6 +4,7 @@
 [`svalinn-shenango/m-semaphore/bench/msem_bench.cc`](https://github.com/GT-ANSR-Lab/svalinn-shenango/blob/474e5d13c9dee4bdff2bdb7dc03c3d3dca90a0c9/m-semaphore/bench/msem_bench.cc),
 using the portable adaptation from
 [`mahoraga` exp-15](https://github.com/cheerioskun/mahoraga/blob/eb8efe4af269516570c082ade4368e66739444f9/experiments/015-hook-benchmarks/target-msem-noshenango.cc).
+The imported code retains [Svalinn's Apache 2.0 license](LICENSE.svalinn-shenango).
 
 It retains synthetic bandwidth of 175000, 45 capacity choices, a ten-sample
 reward window, softmax exploration, and Thompson sampling from 2^18

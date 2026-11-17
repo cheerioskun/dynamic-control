@@ -31,7 +31,7 @@ bench/
   run.py                         run cases and save JSON plus provenance
   README.md                      commands and interpretation
   RESULTS.md                     first sanity measurements
-  results/sanity-*.json           saved samples and source hashes per platform
+  results/*.json                 saved samples and source hashes per platform
 tests/
   runtime.cc                     handwritten ABI/runtime check
   smoke.cc                       compiler-generated dispatch and permit accounting
