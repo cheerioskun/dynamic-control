@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+project(dynamic_control LANGUAGES C CXX)
+
+include(CTest)
+add_subdirectory(runtime)
+if(BUILD_TESTING)
+  find_package(Threads REQUIRED)
+  add_executable(dc_runtime_test tests/runtime.cc)
+  target_link_libraries(dc_runtime_test PRIVATE dynamic_control Threads::Threads)
+  add_test(NAME runtime COMMAND dc_runtime_test)
+endif()
