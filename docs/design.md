@@ -20,8 +20,9 @@ The guard calls acquire, the shared body, and release. Disabling during a guarde
 invocation does not cancel its release. Entries racing with a toggle can select
 either path.
 
-The current mock always permits entry. Real permit failure, nesting, and unwind
-handling are separate follow-up work. Body duplication is a later experiment if
+The current synthetic Svalinn mock always permits entry. Each hook checks the
+clock and periodically updates capacity using synthetic bandwidth. Real permit
+failure, nesting, and unwind handling are separate follow-up work. Body duplication is a later experiment if
 the shared-body wrapper costs enough to matter.
 
 ## Address table
@@ -45,7 +46,8 @@ by static assertions and the execution fixtures.
 One binary contains two identical noinline targets: one plain and one annotated.
 The three measurements are plain, annotated/disabled, and annotated/enabled.
 Lookup and toggles happen before timing. The benchmark links the always-allow
-mock; correctness fixtures substitute counting hooks.
+mock; correctness fixtures substitute counting hooks. Mock initialization is
+outside timing; clock checks and periodic controller work are timed.
 
 See [commands](../bench/README.md) and [results](../bench/RESULTS.md).
 

@@ -57,7 +57,9 @@ of names and addresses. Lookup stays off the function-entry path.
 
 The prototype uses nonthrowing, fixed-arity functions with 64-bit pointers and
 LTO off. Selected boundaries are noinline. The runtime currently links an
-always-allow semaphore mock.
+synthetic memory-semaphore mock adapted from Svalinn's benchmark. It runs real
+clock checks and periodic controller work, while always allowing entry. See
+[the mock](runtime/msem_mock.md).
 
 ## Measurements and source
 

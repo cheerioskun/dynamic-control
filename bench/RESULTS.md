@@ -1,6 +1,6 @@
 # Prototype sanity measurements
 
-## Xeon E5530, Linux x86_64
+## Empty hooks: Xeon E5530, Linux x86_64
 
 2026-11-17, Intel Xeon E5530 @ 2.40 GHz (Nehalem), four cores/eight threads.
 Patched LLVM 23.1.6 compiled the targets; GCC 13.3 compiled the harness, runtime,
@@ -39,7 +39,7 @@ The detached job finished with exit code 0 and `.done`. Full JSON/logs/manifest
 and disassembly are preserved on the node and copied locally under
 `build/node-runs/20261117T190149Z/`.
 
-## Apple M5, macOS ARM64
+## Empty hooks: Apple M5, macOS ARM64
 
 2026-11-17, Apple M5, macOS ARM64. LLVM 23.1.6 with the annotated dispatch patch;
 Google Benchmark v1.10.0. One binary, identical noinline arithmetic targets,

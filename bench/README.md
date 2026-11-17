@@ -34,9 +34,12 @@ python3 bench/run.py --repetitions 7 --min-time 0.2s
 ```
 
 Unhooked minus baseline estimates the cost of making this boundary controllable.
-Hooked minus unhooked includes both the guard and always-allow mock calls. The
-mock always allows entry and has no counters or controller. The baseline is the
-unannotated function in the same binary.
+Hooked minus unhooked includes the guard and synthetic msem calls. The
+[Svalinn mock](../runtime/msem_mock.md) checks the real clock on acquire/release
+and runs its controller every 3 ms using synthetic bandwidth. Initialization
+and Gaussian sample generation happen before timing. It always allows entry,
+with no permit accounting or locking. The baseline is the unannotated function
+in the same binary. Earlier empty-hook results remain in [RESULTS.md](RESULTS.md).
 
 ## Detached Linux node run
 

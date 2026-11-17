@@ -22,7 +22,8 @@ runtime/
   CMakeLists.txt
   dynamic_control.h              descriptor and small C ABI
   dynamic_control.cc             registration, lookup, atomic enable/disable
-  msem_mock.cc                    out-of-line acquire/release; always succeeds
+  msem_mock.cc, msem_mock.h        synthetic Svalinn controller and initialization
+  msem_mock.md                    source provenance and retained behavior
 bench/
   CMakeLists.txt                 Google Benchmark and one three-path executable
   bench.cc                       shared benchmark loop and untimed setup
@@ -54,8 +55,9 @@ The runtime has two records: `DcFunction` describes a function; `DcModule` links
 its module's table into the registry. C ABI functions provide registration,
 lookup, enable/disable, and semaphore acquire/release.
 
-`runtime/msem_mock.cc` supplies the always-allow hooks. The smoke fixture replaces
-these with counting hooks. The benchmark uses the mock without counters.
+`runtime/msem_mock.cc` supplies the synthetic Svalinn hooks. The smoke fixture
+replaces these with counting hooks. The benchmark uses synthetic bandwidth and
+real clock checks, with initialization outside timing.
 
 See [the design](design.md) for dispatch and table details, and
 [the benchmark guide](../bench/README.md) for measurement commands.
