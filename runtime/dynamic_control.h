@@ -23,9 +23,8 @@ typedef struct DcFunction {
   DcEntry *target;
 } DcFunction;
 
-// One writable registration node per module. The compiler's constructor calls
-// __dc_register_module exactly once. Nodes and descriptors live until exit;
-// unloading a registered shared library is not supported in this first slice.
+// One registration node per module, linked by its constructor before main.
+// Nodes and descriptors live until exit.
 typedef struct DcModule {
   const DcFunction *functions;
   size_t count;
@@ -34,16 +33,15 @@ typedef struct DcModule {
 
 void __dc_register_module(DcModule *module) DC_NOEXCEPT;
 
-// Names are exact LLVM/linkage names. Missing or ambiguous names return NULL.
-// Call after module constructors have run. Handles remain valid until exit.
+// Exact, unique LLVM/linkage names. Missing names return NULL.
+// Call after startup registration. Handles remain valid until exit.
 const DcFunction *dc_find(const char *name) DC_NOEXCEPT;
 // Require a non-null handle returned by dc_find. Future entries select the
 // published destination; calls racing with a toggle can take either path.
 void dc_enable(const DcFunction *function) DC_NOEXCEPT;
 void dc_disable(const DcFunction *function) DC_NOEXCEPT;
 
-// The initial implementation always allows entry. Both calls are nonthrowing.
-// Rejected acquisition and nested-permit policies are intentionally unspecified.
+// The synthetic Svalinn mock always allows entry. Both calls are nonthrowing.
 void dc_acquire(const DcFunction *function) DC_NOEXCEPT;
 void dc_release(const DcFunction *function) DC_NOEXCEPT;
 
