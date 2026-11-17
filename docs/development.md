@@ -5,7 +5,7 @@ LLVM is pinned to upstream `llvmorg-23.1.6`. The submodule Git link and
 changes belong in `patches/llvm/`, alongside runtime and tests.
 
 The setup/export/check tools and their real-Git fixture tests are adapted from
-`~/repos/ldb`. The workflow is the same:
+`~/repos/ldb` at `2eb5977f0b774631e31440245c8ca278440c1275`. The workflow is the same:
 
 ```sh
 make setup
@@ -15,7 +15,8 @@ make check-patches
 ```
 
 `DC_BUILD_JOBS` controls compiler build concurrency; default 2. Build only the
-native backend initially. Output stays under ignored `build/llvm/`. On this Mac,
+native backend initially. LLVM 23 also needs the `libc` source directory for
+common utility headers; setup includes it without building the libc runtime. Output stays under ignored `build/llvm/`. On this Mac,
 CMake/Ninja were installed in `build/tools/`; prepend its `bin/` to PATH if needed.
 
 Edit and commit source inside `third_party/llvm`. Its post-commit hook exports

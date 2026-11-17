@@ -3,13 +3,50 @@
 An LLVM 23 compiler extension and runtime for dynamically selecting function
 instrumentation through atomic function-pointer dispatch.
 
-Status: the runtime contract and its handwritten ABI sanity fixture work. The
-annotated compiler pass and Google Benchmark fixture are the next checkpoints.
+LLVM 23.1.6 is pinned. The runtime, annotated IR pass, and LLVM patch workflow
+are implemented. Compiler sanity checks pass at O0 and O2 on macOS ARM64.
+The Google Benchmark fixture is the next checkpoint.
 
 ## Runtime sanity check
 
-With CMake and a C++17 compiler available, run `make test`. This currently tests
-the runtime with handwritten dispatch, not compiler-generated instrumentation.
+With CMake and a C++17 compiler available, run `make test`. This tests the
+runtime independently with handwritten dispatch. Compiler checks are separate:
+
+```sh
+make setup
+make compiler                   # also needs Ninja; initial build is substantial
+make test-compiler               # real transformed code, O0/O2, switch on/off
+make test-tooling
+make check-patches
+```
+
+See [development](docs/development.md) for prerequisites and local tool paths.
+
+## Selection and control
+
+```cpp
+extern "C" [[clang::annotate("dc")]]
+int target(int x) noexcept { return x + 1; }
+```
+
+Compile selected application translation units with `-mllvm -dc-enable`.
+Only annotated definitions are prepared. Compile runtime and harness sources
+without that flag. Without the flag, annotations are inert.
+
+```cpp
+if (const DcFunction *function = dc_find("target")) {
+    dc_enable(function);
+    dc_disable(function);
+}
+```
+
+Handles require a successful lookup. Names are exact linkage names; `extern
+"C"` keeps fixture names simple. All prepared functions start disabled.
+
+This prototype assumes 64-bit pointers and ordinary nonthrowing, fixed-arity
+fixture functions. Use `noexcept` or `-fno-exceptions`; leave LTO off. General ABI,
+unwinding, permit-failure, and nested-permit handling are future work. The pass
+makes selected boundaries noinline; the benchmark baseline is also noinline.
 
 ## First demonstration
 
@@ -32,16 +69,16 @@ Coverage is an explicit design question: source functions versus surviving
 machine functions, optimization and inlining, code compiled by other toolchains,
 and the meaning of a possible six-level limit from an entrypoint.
 
-## Planned LLVM patch workflow
+## LLVM patch workflow
 
 Follow the workflow in [LDB](https://github.com/cheerioskun/ldb):
 
-- Pin `third_party/llvm` to an unmodified upstream LLVM 23 commit.
+- Pin `third_party/llvm` to the unmodified upstream LLVM 23.1.6 commit.
 - Track compiler changes in `patches/llvm/`, alongside runtime and tests.
 - Export local LLVM development commits using `git format-patch` and an ordered
   `series` file. Keep the recorded submodule pin at upstream.
-- Add setup hooks and isolated patch-replay checks when bootstrapping the
-  toolchain; these are not installed or implemented yet.
+- Setup installs export hooks; isolated patch-replay and Git workflow checks
+  protect the pin and preserve unrelated source/index changes.
 
 See [the repository layout](docs/layout.md) and
 [the open design questions](docs/design.md).

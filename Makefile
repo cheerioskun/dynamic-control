@@ -1,4 +1,4 @@
-.PHONY: all configure test setup compiler check-patches test-tooling
+.PHONY: all configure test setup compiler check-patches test-tooling test-compiler
 
 all: configure
 
@@ -20,3 +20,6 @@ check-patches:
 
 test-tooling:
 	python3 -m unittest discover -s tests/tooling -v
+
+test-compiler:
+	python3 tests/compiler.py

@@ -14,4 +14,4 @@ cmake -S "$project_root/third_party/llvm/llvm" -B "$project_root/build/llvm" -G 
     -DLLVM_PARALLEL_LINK_JOBS=1 "$@"
 cmake --build "$project_root/build/llvm" \
     --parallel "${DC_BUILD_JOBS:-2}" \
-    --target clang opt llc FileCheck llvm-objdump
+    --target clang opt llc FileCheck llvm-objdump llvm-config not count

@@ -1,0 +1,408 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Hemant Pandey <29029002+cheerioskun@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 13:42:34 -0500
+Subject: [PATCH] Add annotated atomic function dispatch and permit guards
+
+---
+ .../Instrumentation/DynamicControl.h          |  22 +++
+ llvm/lib/Passes/PassBuilder.cpp               |   1 +
+ llvm/lib/Passes/PassBuilderPipelines.cpp      |  18 ++
+ llvm/lib/Passes/PassRegistry.def              |   1 +
+ .../Transforms/Instrumentation/CMakeLists.txt |   1 +
+ .../Instrumentation/DynamicControl.cpp        | 180 ++++++++++++++++++
+ .../Instrumentation/dynamic-control.ll        |  77 ++++++++
+ 7 files changed, 300 insertions(+)
+ create mode 100644 llvm/include/llvm/Transforms/Instrumentation/DynamicControl.h
+ create mode 100644 llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
+ create mode 100644 llvm/test/Transforms/Instrumentation/dynamic-control.ll
+
+diff --git a/llvm/include/llvm/Transforms/Instrumentation/DynamicControl.h b/llvm/include/llvm/Transforms/Instrumentation/DynamicControl.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4c254b22c0d72c3ad9f6791cdeb407ad5eaf4cc1
+--- /dev/null
++++ b/llvm/include/llvm/Transforms/Instrumentation/DynamicControl.h
+@@ -0,0 +1,22 @@
++//===- DynamicControl.h - Atomic function-entry dispatch ---------*- C++ -*-===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#ifndef LLVM_TRANSFORMS_INSTRUMENTATION_DYNAMICCONTROL_H
++#define LLVM_TRANSFORMS_INSTRUMENTATION_DYNAMICCONTROL_H
++
++#include "llvm/IR/PassManager.h"
++
++namespace llvm {
++class Module;
++class DynamicControlPass : public RequiredPassInfoMixin<DynamicControlPass> {
++public:
++  LLVM_ABI PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
++};
++} // namespace llvm
++
++#endif
+diff --git a/llvm/lib/Passes/PassBuilder.cpp b/llvm/lib/Passes/PassBuilder.cpp
+index 48a5108355c32071ce4940b920e9b46b5389f50c..da4b5b104ce2a59ee1dd14c8203ae0c2310c12aa 100644
+--- a/llvm/lib/Passes/PassBuilder.cpp
++++ b/llvm/lib/Passes/PassBuilder.cpp
+@@ -262,6 +262,7 @@
+ #include "llvm/Transforms/Instrumentation/CGProfile.h"
+ #include "llvm/Transforms/Instrumentation/ControlHeightReduction.h"
+ #include "llvm/Transforms/Instrumentation/DataFlowSanitizer.h"
++#include "llvm/Transforms/Instrumentation/DynamicControl.h"
+ #include "llvm/Transforms/Instrumentation/GCOVProfiler.h"
+ #include "llvm/Transforms/Instrumentation/HWAddressSanitizer.h"
+ #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
+diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
+index 5de45e5668fb92fa2df37ddfa1bc8ac851ef4dd5..b5fb1208e7442ed63fcbeb756fd800596a24fb67 100644
+--- a/llvm/lib/Passes/PassBuilderPipelines.cpp
++++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
+@@ -80,6 +80,7 @@
+ #include "llvm/Transforms/Instrumentation/AllocToken.h"
+ #include "llvm/Transforms/Instrumentation/CGProfile.h"
+ #include "llvm/Transforms/Instrumentation/ControlHeightReduction.h"
++#include "llvm/Transforms/Instrumentation/DynamicControl.h"
+ #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
+ #include "llvm/Transforms/Instrumentation/MemProfInstrumentation.h"
+ #include "llvm/Transforms/Instrumentation/MemProfUse.h"
+@@ -162,6 +163,10 @@ using namespace llvm;
+ 
+ namespace llvm {
+ 
++static cl::opt<bool> EnableDynamicControl(
++    "dc-enable", cl::init(false),
++    cl::desc("Prepare dc-annotated functions for atomic runtime dispatch"));
++
+ static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
+     "enable-ml-inliner", cl::init(InliningAdvisorMode::Default), cl::Hidden,
+     cl::desc("Enable ML policy for inliner. Currently trained for -Oz only"),
+@@ -1782,6 +1787,11 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
+     MPM.addPass(MemProfRemoveInfo());
+ 
+   // Convert @llvm.global.annotations to !annotation metadata.
++  if (EnableDynamicControl) {
++    if (Phase != ThinOrFullLTOPhase::None)
++      report_fatal_error("dynamic-control: LTO is not supported yet");
++    MPM.addPass(DynamicControlPass());
++  }
+   MPM.addPass(Annotation2MetadataPass());
+ 
+   // Force any function attributes we want the rest of the pipeline to observe.
+@@ -1879,6 +1889,8 @@ PassBuilder::buildFatLTODefaultPipeline(OptimizationLevel Level, bool ThinLTO,
+ 
+ ModulePassManager
+ PassBuilder::buildThinLTOPreLinkDefaultPipeline(OptimizationLevel Level) {
++  if (EnableDynamicControl)
++    report_fatal_error("dynamic-control: LTO is not supported yet");
+   if (Level == OptimizationLevel::O0)
+     return buildO0DefaultPipeline(Level, ThinOrFullLTOPhase::ThinLTOPreLink);
+ 
+@@ -2414,6 +2426,12 @@ PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
+ 
+   ModulePassManager MPM;
+ 
++  if (EnableDynamicControl) {
++    if (Phase != ThinOrFullLTOPhase::None)
++      report_fatal_error("dynamic-control: LTO is not supported yet");
++    MPM.addPass(DynamicControlPass());
++  }
++
+   instructionCountersPass(MPM, /* IsPreOptimization */ true);
+ 
+   // Perform pseudo probe instrumentation in O0 mode. This is for the
+diff --git a/llvm/lib/Passes/PassRegistry.def b/llvm/lib/Passes/PassRegistry.def
+index ec5657d3208e9bac5993d24e0ec31f3723b49774..9b622311f47b773ddb9e91d72a0a0e9a0b5a996a 100644
+--- a/llvm/lib/Passes/PassRegistry.def
++++ b/llvm/lib/Passes/PassRegistry.def
+@@ -56,6 +56,7 @@ MODULE_ALIAS_ANALYSIS("globals-aa", GlobalsAA())
+ #endif
+ MODULE_PASS("always-inline", AlwaysInlinerPass())
+ MODULE_PASS("annotation2metadata", Annotation2MetadataPass())
++MODULE_PASS("dynamic-control", DynamicControlPass())
+ MODULE_PASS("assign-guid", AssignGUIDPass())
+ MODULE_PASS("attributor", AttributorPass())
+ MODULE_PASS("attributor-light", AttributorLightPass())
+diff --git a/llvm/lib/Transforms/Instrumentation/CMakeLists.txt b/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
+index 80576c61fd80c94558b00d04e3518e8fc65749bb..05de011d5c4d1e30ab3240ab755d464c4d0a0123 100644
+--- a/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
++++ b/llvm/lib/Transforms/Instrumentation/CMakeLists.txt
+@@ -5,6 +5,7 @@ add_llvm_component_library(LLVMInstrumentation
+   CGProfile.cpp
+   ControlHeightReduction.cpp
+   DataFlowSanitizer.cpp
++  DynamicControl.cpp
+   GCOVProfiling.cpp
+   BlockCoverageInference.cpp
+   MemProfInstrumentation.cpp
+diff --git a/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp b/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c9b1dd1bcd627e67284a3220784baafe1906a69
+--- /dev/null
++++ b/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
+@@ -0,0 +1,180 @@
++//===- DynamicControl.cpp - Atomic function-entry dispatch ------------------===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++
++#include "llvm/Transforms/Instrumentation/DynamicControl.h"
++#include "llvm/ADT/SetVector.h"
++#include "llvm/Analysis/ValueTracking.h"
++#include "llvm/IR/Constants.h"
++#include "llvm/IR/IRBuilder.h"
++#include "llvm/IR/Instructions.h"
++#include "llvm/IR/Module.h"
++#include "llvm/Transforms/Utils/Cloning.h"
++#include "llvm/Transforms/Utils/ModuleUtils.h"
++
++using namespace llvm;
++
++namespace {
++
++// Keep parameter/return contracts, but do not copy pure/nosync/willreturn/etc.
++// The dispatcher reads a mutable slot; the guard calls arbitrary runtime code.
++AttributeList wrapperAttributes(Function &F) {
++  LLVMContext &C = F.getContext();
++  SmallVector<AttributeSet> Args;
++  for (Argument &A : F.args())
++    Args.push_back(F.getAttributes().getParamAttrs(A.getArgNo()));
++  return AttributeList::get(
++      C, AttributeSet::get(C, {Attribute::get(C, Attribute::NoInline),
++                              Attribute::get(C, Attribute::NoUnwind)}),
++      F.getAttributes().getRetAttrs(), Args);
++}
++
++void emitReturn(IRBuilder<> &B, CallInst *Call) {
++  if (Call->getType()->isVoidTy())
++    B.CreateRetVoid();
++  else
++    B.CreateRet(Call);
++}
++
++Constant *prepareFunction(Function &F, Constant *Descriptor, StructType *Record,
++                          FunctionCallee Acquire, FunctionCallee Release) {
++  Module &M = *F.getParent();
++  LLVMContext &C = M.getContext();
++  ValueToValueMapTy Map;
++  // Recursive references must continue to call the original dispatcher.
++  Map[&F] = &F;
++  Function *Body = CloneFunction(&F, Map);
++  Body->setName(F.getName() + ".dc_body");
++  Body->setLinkage(GlobalValue::InternalLinkage);
++  Body->setVisibility(GlobalValue::DefaultVisibility);
++  Body->setDLLStorageClass(GlobalValue::DefaultStorageClass);
++  Body->setComdat(nullptr);
++  Body->addFnAttr(Attribute::NoInline);
++
++  auto Linkage = F.getLinkage();
++  AttributeList WrapperAttrs = wrapperAttributes(F);
++  F.deleteBody();
++  F.setLinkage(Linkage);
++  F.setSubprogram(nullptr);
++  F.setAttributes(WrapperAttrs);
++  // Interposition is outside this initial contract. Internal destinations must
++  // keep the original entry's signature and parameter/return ABI attributes.
++  Function *Guard = Function::Create(F.getFunctionType(),
++                                     GlobalValue::InternalLinkage,
++                                     F.getName() + ".dc_guard", M);
++  Guard->setCallingConv(F.getCallingConv());
++  Guard->setAttributes(WrapperAttrs);
++  auto *Slot = new GlobalVariable(M, Body->getType(), false,
++                                  GlobalValue::InternalLinkage, Body,
++                                  F.getName() + ".dc_target");
++  Slot->setAlignment(M.getDataLayout().getPointerABIAlignment(0));
++
++  IRBuilder<> B(BasicBlock::Create(C, "entry", Guard));
++  B.CreateCall(Acquire, {Descriptor});
++  SmallVector<Value *> Args;
++  for (Argument &A : Guard->args())
++    Args.push_back(&A);
++  auto *BodyCall = B.CreateCall(Body, Args);
++  BodyCall->setCallingConv(Body->getCallingConv());
++  BodyCall->setAttributes(Body->getAttributes());
++  B.CreateCall(Release, {Descriptor});
++  emitReturn(B, BodyCall);
++
++  B.SetInsertPoint(BasicBlock::Create(C, "entry", &F));
++  auto *Destination = B.CreateLoad(Body->getType(), Slot, "destination");
++  Destination->setAtomic(AtomicOrdering::Acquire);
++  Destination->setAlignment(Slot->getAlign().value());
++  Args.clear();
++  for (Argument &A : F.args())
++    Args.push_back(&A);
++  auto *Dispatch = B.CreateCall(F.getFunctionType(), Destination, Args);
++  Dispatch->setCallingConv(F.getCallingConv());
++  Dispatch->setAttributes(WrapperAttrs);
++  Dispatch->setTailCallKind(CallInst::TCK_MustTail);
++  emitReturn(B, Dispatch);
++
++  Constant *Name = B.CreateGlobalString(F.getName(), "__dc_name");
++  return ConstantStruct::get(Record, {Name, Body, Guard, Slot});
++}
++} // namespace
++
++PreservedAnalyses DynamicControlPass::run(Module &M, ModuleAnalysisManager &) {
++  auto *Annotations = M.getNamedGlobal("llvm.global.annotations");
++  if (!Annotations || !Annotations->hasInitializer())
++    return PreservedAnalyses::all();
++  auto *Array = dyn_cast<ConstantArray>(Annotations->getInitializer());
++  if (!Array)
++    return PreservedAnalyses::all();
++
++  SetVector<Function *> Selected;
++  for (const Use &U : Array->operands()) {
++    auto *Annotation = dyn_cast<ConstantStruct>(U.get());
++    StringRef Text;
++    if (!Annotation || Annotation->getNumOperands() < 2 ||
++        !getConstantStringInfo(Annotation->getOperand(1), Text) || Text != "dc")
++      continue;
++    auto *F = dyn_cast<Function>(Annotation->getOperand(0)->stripPointerCasts());
++    if (F && !F->hasFnAttribute("dc.prepared"))
++      Selected.insert(F);
++  }
++  if (Selected.empty())
++    return PreservedAnalyses::all();
++  if (M.getDataLayout().getPointerSizeInBits(0) != 64) {
++    M.getContext().emitError("dynamic-control: requires 64-bit pointers");
++    return PreservedAnalyses::all();
++  }
++  for (Function *F : Selected) {
++    // Prototype contract: ordinary nonthrowing, fixed-arity fixture functions.
++    if (F->isDeclaration() || F->isVarArg() || !F->doesNotThrow()) {
++      M.getContext().emitError("dynamic-control prototype requires a nonthrowing fixed-arity definition");
++      return PreservedAnalyses::all();
++    }
++  }
++
++  LLVMContext &C = M.getContext();
++  Type *Ptr = PointerType::getUnqual(C);
++  Type *Size = M.getDataLayout().getIntPtrType(C);
++  auto *Record = StructType::get(C, {Ptr, Ptr, Ptr, Ptr});
++  auto *TableTy = ArrayType::get(Record, Selected.size());
++  auto *Table = new GlobalVariable(M, TableTy, true,
++                                   GlobalValue::InternalLinkage,
++                                   PoisonValue::get(TableTy), "__dc_functions");
++  auto *HookTy = FunctionType::get(Type::getVoidTy(C), {Ptr}, false);
++  FunctionCallee Acquire = M.getOrInsertFunction("dc_acquire", HookTy);
++  FunctionCallee Release = M.getOrInsertFunction("dc_release", HookTy);
++  for (FunctionCallee Hook : {Acquire, Release})
++    if (auto *F = dyn_cast<Function>(Hook.getCallee()))
++      F->addFnAttr(Attribute::NoUnwind);
++
++  SmallVector<Constant *> Records;
++  for (Function *F : Selected) {
++    Constant *Index[] = {ConstantInt::get(Size, 0),
++                         ConstantInt::get(Size, Records.size())};
++    Constant *Descriptor =
++        ConstantExpr::getInBoundsGetElementPtr(TableTy, Table, Index);
++    Records.push_back(prepareFunction(*F, Descriptor, Record, Acquire, Release));
++    F->addFnAttr("dc.prepared");
++  }
++  Table->setInitializer(ConstantArray::get(TableTy, Records));
++
++  // runtime/dynamic_control.h: {const DcFunction*, size_t, DcModule*}.
++  auto *ModuleTy = StructType::get(C, {Ptr, Size, Ptr});
++  auto *Node = new GlobalVariable(
++      M, ModuleTy, false, GlobalValue::InternalLinkage,
++      ConstantStruct::get(ModuleTy, {Table, ConstantInt::get(Size, Records.size()),
++                                     ConstantPointerNull::get(cast<PointerType>(Ptr))}),
++      "__dc_module");
++  auto Register = M.getOrInsertFunction("__dc_register_module", HookTy);
++  auto *Init = Function::Create(FunctionType::get(Type::getVoidTy(C), false),
++                                GlobalValue::InternalLinkage, "__dc_init", M);
++  Init->addFnAttr(Attribute::NoUnwind);
++  IRBuilder<> B(BasicBlock::Create(C, "entry", Init));
++  B.CreateCall(Register, {Node});
++  B.CreateRetVoid();
++  appendToGlobalCtors(M, Init, 65535);
++  return PreservedAnalyses::none();
++}
+diff --git a/llvm/test/Transforms/Instrumentation/dynamic-control.ll b/llvm/test/Transforms/Instrumentation/dynamic-control.ll
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f32cb1a645d45f62be515c3d4242cf01b552452
+--- /dev/null
++++ b/llvm/test/Transforms/Instrumentation/dynamic-control.ll
+@@ -0,0 +1,77 @@
++; RUN: opt -passes=dynamic-control -verify-each -S %s | FileCheck %s
++; RUN: opt -passes='dynamic-control,dynamic-control' -verify-each -S %s | FileCheck %s
++; RUN: opt -dc-enable -passes='default<O2>' -verify-each -S %s | FileCheck %s --check-prefix=OPT
++; RUN: opt -passes='default<O2>' -S %s | FileCheck %s --check-prefix=OFF
++
++target datalayout = "e-m:e-p:64:64-i64:64-n8:16:32:64-S128"
++
++@annotation = private constant [3 x i8] c"dc\00"
++@file = private constant [2 x i8] c"x\00"
++@llvm.global.annotations = appending global [2 x {ptr, ptr, ptr, i32, ptr}] [
++  {ptr, ptr, ptr, i32, ptr} {ptr @foo, ptr @annotation, ptr @file, i32 1, ptr null},
++  {ptr, ptr, ptr, i32, ptr} {ptr @notify, ptr @annotation, ptr @file, i32 2, ptr null}
++]
++
++; CHECK: @__dc_functions = internal constant [2 x { ptr, ptr, ptr, ptr }]
++; CHECK-SAME: ptr @foo.dc_body, ptr @foo.dc_guard, ptr @foo.dc_target
++; CHECK-SAME: ptr @notify.dc_body, ptr @notify.dc_guard, ptr @notify.dc_target
++; CHECK: @foo.dc_target = internal global ptr @foo.dc_body, align 8
++; CHECK: @notify.dc_target = internal global ptr @notify.dc_body, align 8
++; CHECK: @__dc_module = internal global { ptr, i64, ptr } { ptr @__dc_functions, i64 2, ptr null }
++; CHECK: @llvm.global_ctors = appending global
++
++define i64 @foo(i64 %x) nounwind {
++; CHECK-LABEL: define i64 @foo(
++; CHECK: %destination = load atomic ptr, ptr @foo.dc_target acquire, align 8
++; CHECK-NEXT: [[RESULT:%.*]] = musttail call i64 %destination(i64 %x)
++; CHECK-NEXT: ret i64 [[RESULT]]
++  %result = add i64 %x, 1
++  ret i64 %result
++}
++
++define void @notify(ptr %p) nounwind {
++; CHECK-LABEL: define void @notify(
++; CHECK: load atomic ptr, ptr @notify.dc_target acquire, align 8
++; CHECK: musttail call void %destination(ptr %p)
++; CHECK-NEXT: ret void
++  store i8 1, ptr %p
++  ret void
++}
++
++define i64 @untouched(i64 %x) nounwind {
++; CHECK-LABEL: define i64 @untouched(
++; CHECK-NEXT: %result = add i64 %x, 2
++  %result = add i64 %x, 2
++  ret i64 %result
++}
++
++; CHECK-LABEL: define internal i64 @foo.dc_body(
++; CHECK: add i64 %x, 1
++; CHECK-LABEL: define internal i64 @foo.dc_guard(
++; CHECK: call void @dc_acquire(ptr @__dc_functions)
++; CHECK-NEXT: [[BODY:%.*]] = call i64 @foo.dc_body(
++; CHECK-NEXT: call void @dc_release(ptr @__dc_functions)
++; CHECK-NEXT: ret i64 [[BODY]]
++; CHECK-LABEL: define internal void @notify.dc_guard(
++; CHECK: call void @dc_acquire(
++; CHECK-NEXT: call void @notify.dc_body(
++; CHECK-NEXT: call void @dc_release(
++; CHECK-NEXT: ret void
++; CHECK-LABEL: define internal void @__dc_init(
++; CHECK: call void @__dc_register_module(ptr @__dc_module)
++
++; OPT-LABEL: define i64 @foo(
++; OPT: load atomic ptr, ptr @foo.dc_target acquire, align 8
++; OPT: musttail call i64
++; OPT-LABEL: define void @notify(
++; OPT: load atomic ptr, ptr @notify.dc_target acquire, align 8
++; OPT: musttail call void
++; OPT-LABEL: define internal i64 @foo.dc_guard(
++; OPT: call void @dc_acquire(
++; OPT: call i64 @foo.dc_body(
++; OPT: call void @dc_release(
++
++; OFF-NOT: __dc_
++; OFF-NOT: .dc_target
++; OFF: define i64 @foo(
++; OFF: add i64 %x, 1

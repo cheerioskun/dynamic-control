@@ -1,7 +1,7 @@
 # Minimal repository layout
 
-The runtime, top-level build, and handwritten runtime ABI fixture are implemented.
-The compiler workflow, pass, and benchmark remain planned at checkpoint 1.
+The runtime, compiler pass, compiler workflow, and integration tests are
+implemented. The benchmark is the next checkpoint.
 
 ```text
 README.md
@@ -13,7 +13,7 @@ patches/llvm/
   0001-Add-dynamic-control.patch  pass, pipeline integration, LLVM regression tests
 scripts/
   llvm.py                         adapt LDB setup/export/check workflow
-  build-llvm.sh                   build baseline and patched toolchains separately
+  build-llvm.sh                   build the patched native LLVM toolchain
 .githooks/
   pre-commit                     validate/export patch series
   llvm/post-commit               export local compiler commits
@@ -31,6 +31,8 @@ bench/
 tests/
   runtime.cc                     handwritten ABI/runtime check
   smoke.cc                       compiler-generated dispatch and permit accounting
+  targets.cc, targets_extra.cc   annotated/unannotated targets in two modules
+  compiler.py                    O0/O2, switch on/off, IR and execution checks
   tooling/test_llvm_workflow.py   retain LDB workflow checks when porting tooling
 docs/
   design.md

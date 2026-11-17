@@ -38,3 +38,22 @@ approach cannot satisfy. Validate ABI forwarding and generated machine code;
 LLVM's `musttail` has calling-convention, signature, and attribute constraints.
 
 Reference: [LLVM call instruction](https://llvm.org/docs/LangRef.html#call-instruction).
+
+## Initial implementation choices
+
+The first pass runs before optimization, consumes `llvm.global.annotations`,
+and preserves selected entry boundaries with noinline. It keeps the original
+function symbol/address as the dispatcher; recursive calls and existing function
+pointers therefore continue to enter it. The dispatcher performs an acquire
+load followed by a musttail call. No frame-lowering changes are involved.
+
+Each module emits a constant descriptor array `{name, body, guard, slot}` and a
+writable registration node `{table, count, next}`. A constructor registers the
+node. Each function's separate writable, pointer-aligned slot starts at its body.
+The runtime publishes guard/body using release stores. The registry needs no
+heap allocation and does not participate in the function-entry path.
+
+The prototype targets ordinary fixed-arity C ABI functions with 64-bit pointers
+and nounwind. Broader ABI coverage and hardening are deferred. Tables/nodes stay
+loaded until exit. Exact linkage names are used; strong C linkage names keep
+fixtures simple.
