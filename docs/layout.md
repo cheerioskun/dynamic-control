@@ -1,7 +1,7 @@
 # Minimal repository layout
 
-The runtime, compiler pass, compiler workflow, and integration tests are
-implemented. The benchmark is the next checkpoint.
+The runtime, compiler pass, compiler workflow, integration tests, and benchmark
+are implemented. This remains a prototype for the annotated fixture functions.
 
 ```text
 README.md
@@ -10,7 +10,7 @@ toolchain.json                    upstream URL, exact LLVM 23 revision, build se
 third_party/llvm/                 upstream submodule, recorded pin stays unmodified
 patches/llvm/
   series
-  0001-Add-dynamic-control.patch  pass, pipeline integration, LLVM regression tests
+  0001-*.patch                   pass, pipeline integration, LLVM regression tests
 scripts/
   llvm.py                         adapt LDB setup/export/check workflow
   build-llvm.sh                   build the patched native LLVM toolchain
@@ -28,6 +28,8 @@ bench/
   targets.cc                     noinline target functions in a separate TU
   run.py                         build/run cases and save JSON plus provenance
   README.md                      commands and interpretation
+  RESULTS.md                     first sanity measurements
+  results/sanity-macos-arm64.json compact saved samples and source hashes
 tests/
   runtime.cc                     handwritten ABI/runtime check
   smoke.cc                       compiler-generated dispatch and permit accounting

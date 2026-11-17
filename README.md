@@ -3,9 +3,9 @@
 An LLVM 23 compiler extension and runtime for dynamically selecting function
 instrumentation through atomic function-pointer dispatch.
 
-LLVM 23.1.6 is pinned. The runtime, annotated IR pass, and LLVM patch workflow
-are implemented. Compiler sanity checks pass at O0 and O2 on macOS ARM64.
-The Google Benchmark fixture is the next checkpoint.
+LLVM 23.1.6 is pinned. The runtime, annotated IR pass, LLVM patch workflow, and
+Google Benchmark fixture work. Compiler sanity checks pass at O0 and O2 on
+macOS ARM64. No frame-lowering changes.
 
 ## Runtime sanity check
 
@@ -18,9 +18,11 @@ make compiler                   # also needs Ninja; initial build is substantial
 make test-compiler               # real transformed code, O0/O2, switch on/off
 make test-tooling
 make check-patches
+make bench                      # build/run baseline, unhooked, hooked
 ```
 
 See [development](docs/development.md) for prerequisites and local tool paths.
+See [benchmarks](bench/README.md) and [the first measurements](bench/RESULTS.md).
 
 ## Selection and control
 
