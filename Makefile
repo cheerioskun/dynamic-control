@@ -1,4 +1,4 @@
-.PHONY: all configure test
+.PHONY: all configure test setup compiler check-patches test-tooling
 
 all: configure
 
@@ -8,3 +8,15 @@ configure:
 
 test: configure
 	ctest --test-dir build/runtime --output-on-failure
+
+setup:
+	python3 scripts/llvm.py setup
+
+compiler:
+	./scripts/build-llvm.sh
+
+check-patches:
+	python3 scripts/llvm.py check
+
+test-tooling:
+	python3 -m unittest discover -s tests/tooling -v
