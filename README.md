@@ -3,6 +3,9 @@
 An LLVM 23.1.6 pass and runtime for toggling memory-semaphore hooks on annotated
 functions. Dispatch uses atomic function pointers. No frame-lowering changes.
 
+[Start at the checkpoint](CHECKPOINT.md) for a reading order, design choices,
+saved artifacts, and verification commands.
+
 ## Build and run
 
 Requires Git, Python 3, CMake, Ninja, and a C++17 compiler.
@@ -40,26 +43,9 @@ if (const DcFunction *function = dc_find("target")) {
 ```
 
 Names are exact linkage names; `extern "C"` keeps them simple. `dc_find` returns
-null for missing or ambiguous names. Prepared functions start disabled. Toggling
-affects future entries; calls already in a guard finish and release their permit.
-
-## Dispatch
-
-An annotated `foo` keeps its public entry and gains three private symbols:
-
-- `foo.dc_body`: the original implementation.
-- `foo.dc_guard`: acquire, call the body, release, return.
-- `foo.dc_target`: a writable atomic pointer, initially pointing to the body.
-
-`foo` acquire-loads the slot and tail-dispatches. Enabling publishes the guard;
-disabling publishes the body. A module constructor registers a constant table
-of names and addresses. Lookup stays off the function-entry path.
-
-The prototype uses nonthrowing, fixed-arity functions with 64-bit pointers and
-LTO off. Selected boundaries are noinline. The runtime currently links an
-synthetic memory-semaphore mock adapted from Svalinn's benchmark. It runs real
-clock checks and periodic controller work, while always allowing entry. See
-[the mock](runtime/msem_mock.md).
+null for missing names; names are unique in this prototype. Prepared functions
+start disabled. Toggling affects future entries; calls already in a guard finish
+and execute their release hook.
 
 ## Measurements and source
 
@@ -69,5 +55,4 @@ measures baseline, unhooked, and hooked calls in one binary.
 LLVM stays pinned to unmodified upstream source. Compiler edits are committed
 locally inside the submodule and exported to `patches/llvm/`, following
 [LDB's workflow](https://github.com/cheerioskun/ldb). See
-[the design](docs/design.md), [layout](docs/layout.md), and
-[development commands](docs/development.md).
+[the checkpoint](CHECKPOINT.md) and [development commands](docs/development.md).
