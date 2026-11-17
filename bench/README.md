@@ -39,3 +39,20 @@ Hooked minus unhooked includes both the guard and always-allow mock calls. The
 mock has no counters, controller, real permits, or contention. The baseline is
 an untransformed function in the same binary, not a separate stock-Clang build.
 No application-speedup, real semaphore, or cross-machine claim follows.
+
+## Detached Linux node run
+
+From a checkout on the node, with Clang, CMake, Ninja, LLD, Git, and Python:
+
+```sh
+mkdir -p build/node-runs/first
+nohup setsid env CC=clang CXX=clang++ DC_BUILD_JOBS=4 DC_BENCH_CPU=2 \
+  bash scripts/run-node.sh "$PWD/build/node-runs/first" \
+  >build/node-runs/first/launcher.log 2>&1 </dev/null &
+```
+
+Use a new run directory each time. The script prepares LLVM, builds the compiler,
+runs sanity checks, builds the fixture, saves disassembly, then measures on the
+chosen CPU. It uses seven randomized blocks with at least 0.5 seconds per sample.
+The run directory holds `run.log`, `pid`, `phase`, `exit-code`, and `.done` on
+success or `.failed` on failure. Raw benchmark data is under `results/`.

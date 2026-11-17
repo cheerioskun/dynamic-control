@@ -54,6 +54,7 @@ def main():
         "started_utc": timestamp, "seed": args.seed, "commands": commands,
         "system": platform.system(), "release": platform.release(),
         "machine": platform.machine(), "logical_cpus": os.cpu_count(),
+        "cpu_affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
         "parent_commit": output("git", "rev-parse", "HEAD"),
         "dirty": bool(output("git", "status", "--porcelain", "--ignore-submodules")),
         "llvm_commit": output("git", "-C", "third_party/llvm", "rev-parse", "HEAD"),
