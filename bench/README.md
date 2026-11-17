@@ -26,8 +26,7 @@ call, a data dependency on the prior result, and `DoNotOptimize`.
 Raw Google Benchmark JSON, logs, a manifest (binary/source hashes, LLVM tree,
 target compiler command, run order, machine metadata), and summary stay under
 ignored `build/bench/results/<UTC run>/`. Summaries report CPU ns/call, medians,
-and differences of medians; inspect individual samples before interpreting small
-differences. They include loop overhead and the chosen call dependency pattern.
+and differences of medians. Each sample includes the loop and its data dependency.
 
 ```sh
 build/bench/dc_bench --dc-mode=hooked --benchmark_min_time=0.2s
@@ -36,9 +35,8 @@ python3 bench/run.py --repetitions 7 --min-time 0.2s
 
 Unhooked minus baseline estimates the cost of making this boundary controllable.
 Hooked minus unhooked includes both the guard and always-allow mock calls. The
-mock has no counters, controller, real permits, or contention. The baseline is
-an untransformed function in the same binary, not a separate stock-Clang build.
-No application-speedup, real semaphore, or cross-machine claim follows.
+mock always allows entry and has no counters or controller. The baseline is the
+unannotated function in the same binary.
 
 ## Detached Linux node run
 

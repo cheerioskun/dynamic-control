@@ -1,36 +1,50 @@
 # LLVM development
 
-LLVM is pinned to upstream `llvmorg-23.1.6`. The submodule Git link and
-`toolchain.json` must identify the same unmodified upstream commit. Compiler
-changes belong in `patches/llvm/`, alongside runtime and tests.
+LLVM is pinned to `llvmorg-23.1.6`. The submodule Git link and `toolchain.json`
+identify the same unmodified upstream commit. Compiler changes live in
+`patches/llvm/`, alongside runtime and tests.
 
-The setup/export/check tools and their real-Git fixture tests are adapted from
-`~/repos/ldb` at `2eb5977f0b774631e31440245c8ca278440c1275`. The workflow is the same:
+Setup/export/check tools and Git fixture tests come from
+[LDB](https://github.com/cheerioskun/ldb/tree/2eb5977f0b774631e31440245c8ca278440c1275).
 
 ```sh
 make setup
-make compiler                 # CMake, Ninja, host C++ compiler required
+make compiler
+make test
+make test-compiler
 make test-tooling
 make check-patches
 ```
 
-`DC_BUILD_JOBS` controls compiler build concurrency; default 2. Build only the
-native backend initially. LLVM 23 also needs the `libc` source directory for
-common utility headers; setup includes it without building the libc runtime. Output stays under ignored `build/llvm/`. On this Mac,
-CMake/Ninja were installed in `build/tools/`; prepend its `bin/` to PATH if needed.
+- `test`: runtime checks with handwritten dispatch.
+- `test-compiler`: IR and execution checks at O0/O2, with the switch on and off.
+- `test-tooling`: Git workflow fixtures, without downloading LLVM.
+- `check-patches`: replay staged patches against the upstream pin.
 
-Edit and commit source inside `third_party/llvm`. Its post-commit hook exports
-and stages the patch series in the parent. Then stage the related parent files
-and commit normally. The parent pre-commit hook verifies/re-exports patches.
+## Build settings
 
-Do not stage the LLVM submodule's development HEAD as an upstream upgrade.
-The parent pin stays upstream even while the local checkout contains patch
-commits. `python3 scripts/llvm.py export` is the manual export command.
+Requires Git, Python 3, CMake, Ninja, and a C++17 compiler. Build output stays
+under `build/llvm/`. `DC_BUILD_JOBS` sets parallelism (default 2); only the native
+backend is built. Setup includes LLVM's `libc` source for common headers without
+building the libc runtime. Extra CMake settings go to `scripts/build-llvm.sh`.
 
-Setup is idempotent and preserves developer edits. Patch checking reconstructs
-the staged series in an isolated index. Hooks reject dirty compiler source,
-manual patch edits that would be overwritten, and accidental pin changes.
-Run setup in every clone to install the hooks.
+CMake and Ninja can be installed inside the checkout:
 
-Source/IR regression checks, runtime checks, and compiler builds are separate
-evidence. A successful patch replay is not evidence that the extension works.
+```sh
+python3 -m venv build/tools
+build/tools/bin/pip install cmake ninja
+export PATH="$PWD/build/tools/bin:$PATH"
+```
+
+## Commit compiler changes
+
+Edit and commit inside `third_party/llvm`. Its post-commit hook exports and stages
+the patch series in the parent. Stage related runtime/test changes and commit
+the parent normally. Its pre-commit hook verifies and re-exports the series.
+
+Keep the recorded submodule pin at upstream; do not stage its local development
+HEAD. `python3 scripts/llvm.py export` exports manually. Setup preserves local
+source edits; checks use an isolated index. Run `make setup` in every clone to
+activate the hooks.
+
+For a detached Linux build and benchmark, see [the node runner](../bench/README.md#detached-linux-node-run).

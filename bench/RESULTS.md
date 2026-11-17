@@ -11,11 +11,9 @@ process per case, minimum 0.2 seconds per measurement.
 | Unhooked | 1.229 | 0.845–1.574 |
 | Hooked | 2.075 | 2.064–2.095 |
 
-The unhooked measurements vary too much to resolve the dispatch penalty in this
-run. Their lower median is not evidence that adding dispatch makes calls faster.
-The hooked path includes wrapper and mock-call costs; the two costs are not
-isolated. These are local fixture measurements, not real semaphore or application
-performance results.
+Hooked minus unhooked is 0.846 ns/call between medians. The unhooked samples span
+0.845–1.574 ns/call, leaving the dispatch penalty unresolved. This fixture measures
+the wrapper and empty acquire/release calls together.
 
 The linked assembly retains both timed target calls. Baseline and body have
 identical arithmetic instructions. The ARM64 dispatcher contains an acquire
