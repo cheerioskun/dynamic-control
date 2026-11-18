@@ -27,6 +27,8 @@ Requires Git, Python 3, CMake, Ninja, and a C++17 compiler. Build output stays
 under `build/llvm/`. `DC_BUILD_JOBS` sets parallelism (default 2); only the native
 backend is built. Setup includes LLVM's `libc` source for common headers without
 building the libc runtime. Extra CMake settings go to `scripts/build-llvm.sh`.
+The build exports `build/llvm/compile_commands.json`; `.clangd` points the editor
+there so LLVM's source and generated headers resolve.
 
 CMake and Ninja can be installed inside the checkout:
 
