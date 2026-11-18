@@ -1,0 +1,128 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Hemant Pandey <29029002+cheerioskun@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 22:10:55 -0500
+Subject: [PATCH 2/2] Prepare surviving annotated definitions after per-file
+ optimization
+
+---
+ llvm/lib/Passes/PassBuilderPipelines.cpp      | 24 +++++++++----------
+ .../Instrumentation/DynamicControl.cpp        | 19 +++++++--------
+ 2 files changed, 19 insertions(+), 24 deletions(-)
+
+diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
+index b5fb1208e7442ed63fcbeb756fd800596a24fb67..b794961056269fb7bfc92ad701f687f7527c21bc 100644
+--- a/llvm/lib/Passes/PassBuilderPipelines.cpp
++++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
+@@ -1787,11 +1787,6 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
+     MPM.addPass(MemProfRemoveInfo());
+ 
+   // Convert @llvm.global.annotations to !annotation metadata.
+-  if (EnableDynamicControl) {
+-    if (Phase != ThinOrFullLTOPhase::None)
+-      report_fatal_error("dynamic-control: LTO is not supported yet");
+-    MPM.addPass(DynamicControlPass());
+-  }
+   MPM.addPass(Annotation2MetadataPass());
+ 
+   // Force any function attributes we want the rest of the pipeline to observe.
+@@ -1819,6 +1814,10 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
+   // Emit annotation remarks.
+   addAnnotationRemarksPass(MPM);
+ 
++  // Treat dc annotations as hints on definitions surviving optimization.
++  if (EnableDynamicControl)
++    MPM.addPass(DynamicControlPass());
++
+   if (isLTOPreLink(Phase))
+     addRequiredLTOPreLinkPasses(MPM);
+ 
+@@ -1889,8 +1888,6 @@ PassBuilder::buildFatLTODefaultPipeline(OptimizationLevel Level, bool ThinLTO,
+ 
+ ModulePassManager
+ PassBuilder::buildThinLTOPreLinkDefaultPipeline(OptimizationLevel Level) {
+-  if (EnableDynamicControl)
+-    report_fatal_error("dynamic-control: LTO is not supported yet");
+   if (Level == OptimizationLevel::O0)
+     return buildO0DefaultPipeline(Level, ThinOrFullLTOPhase::ThinLTOPreLink);
+ 
+@@ -1951,6 +1948,9 @@ PassBuilder::buildThinLTOPreLinkDefaultPipeline(OptimizationLevel Level) {
+   // Attach !implicit.ref metadata from all functions to copyright strings.
+   MPM.addPass(LowerCommentStringPass());
+ 
++  if (EnableDynamicControl)
++    MPM.addPass(DynamicControlPass());
++
+   addRequiredLTOPreLinkPasses(MPM);
+ 
+   instructionCountersPass(MPM, /* IsPreOptimization */ false);
+@@ -2426,12 +2426,6 @@ PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
+ 
+   ModulePassManager MPM;
+ 
+-  if (EnableDynamicControl) {
+-    if (Phase != ThinOrFullLTOPhase::None)
+-      report_fatal_error("dynamic-control: LTO is not supported yet");
+-    MPM.addPass(DynamicControlPass());
+-  }
+-
+   instructionCountersPass(MPM, /* IsPreOptimization */ true);
+ 
+   // Perform pseudo probe instrumentation in O0 mode. This is for the
+@@ -2547,6 +2541,10 @@ PassBuilder::buildO0DefaultPipeline(OptimizationLevel Level,
+   // Attach !implicit.ref metadata from all functions to copyright strings.
+   MPM.addPass(LowerCommentStringPass());
+ 
++  // Treat dc annotations as hints on definitions surviving optimization.
++  if (EnableDynamicControl)
++    MPM.addPass(DynamicControlPass());
++
+   if (isLTOPreLink(Phase))
+     addRequiredLTOPreLinkPasses(MPM);
+ 
+diff --git a/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp b/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
+index 6c9b1dd1bcd627e67284a3220784baafe1906a69..2092ab1c557e19ad4fbee49a36e6d7539489378f 100644
+--- a/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
++++ b/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp
+@@ -53,11 +53,16 @@ Constant *prepareFunction(Function &F, Constant *Descriptor, StructType *Record,
+   Body->setVisibility(GlobalValue::DefaultVisibility);
+   Body->setDLLStorageClass(GlobalValue::DefaultStorageClass);
+   Body->setComdat(nullptr);
++  // A cloned definition needs its own LTO identity after renaming.
++  Body->reassignGUID();
++  Body->removeFnAttr(Attribute::AlwaysInline);
+   Body->addFnAttr(Attribute::NoInline);
+ 
+   auto Linkage = F.getLinkage();
+   AttributeList WrapperAttrs = wrapperAttributes(F);
++  MDNode *GUID = F.getMetadata(LLVMContext::MD_unique_id);
+   F.deleteBody();
++  F.setMetadata(LLVMContext::MD_unique_id, GUID);
+   F.setLinkage(Linkage);
+   F.setSubprogram(nullptr);
+   F.setAttributes(WrapperAttrs);
+@@ -118,22 +123,14 @@ PreservedAnalyses DynamicControlPass::run(Module &M, ModuleAnalysisManager &) {
+         !getConstantStringInfo(Annotation->getOperand(1), Text) || Text != "dc")
+       continue;
+     auto *F = dyn_cast<Function>(Annotation->getOperand(0)->stripPointerCasts());
+-    if (F && !F->hasFnAttribute("dc.prepared"))
++    if (F && !F->isDeclarationForLinker() && !F->isVarArg() &&
++        F->doesNotThrow() && !F->hasFnAttribute("dc.prepared"))
+       Selected.insert(F);
+   }
+   if (Selected.empty())
+     return PreservedAnalyses::all();
+-  if (M.getDataLayout().getPointerSizeInBits(0) != 64) {
+-    M.getContext().emitError("dynamic-control: requires 64-bit pointers");
++  if (M.getDataLayout().getPointerSizeInBits(0) != 64)
+     return PreservedAnalyses::all();
+-  }
+-  for (Function *F : Selected) {
+-    // Prototype contract: ordinary nonthrowing, fixed-arity fixture functions.
+-    if (F->isDeclaration() || F->isVarArg() || !F->doesNotThrow()) {
+-      M.getContext().emitError("dynamic-control prototype requires a nonthrowing fixed-arity definition");
+-      return PreservedAnalyses::all();
+-    }
+-  }
+ 
+   LLVMContext &C = M.getContext();
+   Type *Ptr = PointerType::getUnqual(C);

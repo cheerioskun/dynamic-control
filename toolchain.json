@@ -2,5 +2,5 @@
   "llvm_major": 23,
   "upstream_tag": "llvmorg-23.1.6",
   "upstream_revision": "5b10d2d74929eae78912771222c9855af97496f4",
-  "sparse_paths": ["llvm", "clang", "cmake", "third-party", "libc"]
+  "sparse_paths": ["llvm", "clang", "lld", "cmake", "third-party", "libc"]
 }

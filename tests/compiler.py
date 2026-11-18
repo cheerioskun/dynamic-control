@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--clang", type=Path, default=ROOT / "build/llvm/bin/clang++")
     parser.add_argument("--cxx", default=os.environ.get("CXX", "c++"))
+    parser.add_argument("--lto", choices=("full", "thin"))
     args = parser.parse_args()
     if not args.clang.is_file():
         parser.error("patched clang++ not found; run make compiler first")
@@ -28,20 +29,31 @@ def main():
         sdk = subprocess.check_output(["xcrun", "--show-sdk-path"], text=True).strip()
         target_flags = ["-isysroot", sdk]
     tools = args.clang.parent
+    lto_flags = [f"-flto={args.lto}"] if args.lto else []
+    link_flags = []
+    if args.lto:
+        args.cxx = args.clang
+        if platform.system() == "Darwin":
+            link_flags = [f"-Wl,-lto_library,{tools.parent}/lib/libLTO.dylib"]
+        else:
+            link_flags = [f"-fuse-ld={tools}/ld.lld"]
     run([tools / "llvm-lit", "-v",
          ROOT / "third_party/llvm/llvm/test/Transforms/Instrumentation/dynamic-control.ll"])
     for level in (0, 2):
         for enabled in (False, True):
             label = f"O{level}-{'on' if enabled else 'off'}"
+            if args.lto:
+                label += f"-{args.lto}"
             objects = []
             for source in ("targets", "targets_extra"):
                 obj = output / f"{source}-{label}.o"
                 flags = ["-mllvm", "-dc-enable"] if enabled else []
-                run([args.clang, *target_flags, "-std=c++17", f"-O{level}", "-fno-exceptions",
+                run([args.clang, *target_flags, *lto_flags, "-std=c++17", f"-O{level}", "-fno-exceptions",
                      *flags, "-c", ROOT / f"tests/{source}.cc", "-o", obj])
                 objects.append(obj)
             exe = output / f"smoke-{label}"
-            run([args.cxx, "-std=c++17", "-O2", "-pthread", "-Iruntime",
+            run([args.cxx, *target_flags, *lto_flags, *link_flags,
+                 "-std=c++17", "-O2", "-pthread", "-Iruntime",
                  ROOT / "runtime/dynamic_control.cc", ROOT / "tests/smoke.cc",
                  *objects, "-o", exe])
             run([exe] + ([] if enabled else ["--expect-unprepared"]))

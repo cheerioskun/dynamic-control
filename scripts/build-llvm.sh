@@ -2,10 +2,17 @@
 set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 python3 "$project_root/scripts/llvm.py" setup
+projects=clang
+if [ "$(uname)" = Darwin ]; then
+    lto_target=LTO
+else
+    projects='clang;lld'
+    lto_target=lld
+fi
 cmake -S "$project_root/third_party/llvm/llvm" -B "$project_root/build/llvm" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DLLVM_ENABLE_PROJECTS=clang \
+    -DLLVM_ENABLE_PROJECTS="$projects" \
     -DLLVM_TARGETS_TO_BUILD=Native \
     -DLLVM_ENABLE_ASSERTIONS=ON \
     -DLLVM_INCLUDE_TESTS=ON \
@@ -15,4 +22,5 @@ cmake -S "$project_root/third_party/llvm/llvm" -B "$project_root/build/llvm" -G 
     -DLLVM_PARALLEL_LINK_JOBS=1 "$@"
 cmake --build "$project_root/build/llvm" \
     --parallel "${DC_BUILD_JOBS:-2}" \
-    --target clang opt llc FileCheck llvm-objdump llvm-config not count
+    --target clang opt llc FileCheck llvm-objdump llvm-config not count \
+             llvm-ar llvm-ranlib "$lto_target"

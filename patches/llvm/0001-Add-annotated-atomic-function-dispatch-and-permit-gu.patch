@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Hemant Pandey <29029002+cheerioskun@users.noreply.github.com>
 Date: Tue, 17 Nov 2026 13:42:34 -0500
-Subject: [PATCH] Add annotated atomic function dispatch and permit guards
+Subject: [PATCH 1/2] Add annotated atomic function dispatch and permit guards
 
 ---
  .../Instrumentation/DynamicControl.h          |  22 +++

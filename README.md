@@ -31,9 +31,10 @@ extern "C" [[clang::annotate("dc")]]
 int target(int x) noexcept { return x + 1; }
 ```
 
-Compile application targets with `-mllvm -dc-enable`. The pass prepares annotated
-definitions; other functions compile normally. Runtime and harness sources use
-the host compiler without that flag.
+Compile application targets with `-mllvm -dc-enable`. The annotation is a hint:
+the pass prepares definitions remaining after per-file optimization. It does not
+preserve calls or hook copies already inlined. Full LTO and ThinLTO are supported;
+the flag is only needed at compilation. Other functions compile normally.
 
 ```cpp
 if (const DcFunction *function = dc_find("target")) {

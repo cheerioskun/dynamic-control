@@ -14,14 +14,19 @@ LLVM is 23.1.6. There are no frame-lowering changes.
 | [bench/bench.cc](bench/bench.cc) | Same timed loop, three modes, setup outside timing |
 | [runtime/msem_mock.cc](runtime/msem_mock.cc) | Copied synthetic controller; [provenance and behavior](runtime/msem_mock.md) |
 
-The compiler source appears after `make setup`. Its published form is the single
-patch listed in [patches/llvm/series](patches/llvm/series).
+The compiler source appears after `make setup`. Its published form is the
+patch series in [patches/llvm/series](patches/llvm/series).
 
 ## Design choices
 
 Selection has two knobs: `[[clang::annotate("dc")]]` on a definition and
 `-mllvm -dc-enable` when compiling it. Unannotated functions have no slot or
 redirection. C linkage gives the fixtures simple lookup names.
+
+The annotation is a hint. The pass runs late in each file's compilation, after
+ordinary optimization and before LTO. It prepares remaining eligible definitions;
+it does not preserve calls, prevent earlier inlining, or hook inlined copies.
+Full LTO and ThinLTO then proceed normally; no link-time enable flag is needed.
 
 For each selected `foo`, the pass emits:
 
@@ -32,8 +37,10 @@ foo.dc_guard: dc_acquire(descriptor); call body; dc_release(descriptor); return
 foo.dc_target initially points to body
 ```
 
-The public entry stays `foo`, including for function pointers and recursion.
-`noinline` preserves these boundaries. `musttail` removes the dispatcher's frame.
+The public entry stays `foo`, including for function pointers and surviving
+recursive calls. The benchmark explicitly uses `noinline` to keep its measurement
+boundary. Prepared dispatchers, guards, and bodies are also `noinline`.
+`musttail` removes the dispatcher's frame.
 The guard shares the body, so it pays an extra call instead of duplicating code.
 Wrappers drop the original function's purity/side-effect attributes: loading a
 mutable destination and calling hooks must remain visible to optimization.
@@ -48,7 +55,7 @@ Entries racing with a toggle can take either path. An invocation already in a
 guard still executes its release, even if its body disables the function.
 
 Happy-path assumptions: fixed-arity nonthrowing functions, 64-bit pointers,
-LTO off, unique linkage names, valid handles, startup registration, and modules
+unique linkage names, valid handles, startup registration, and modules
 remaining loaded. Broad selection, binary patching, and real permit policy are
 outside this checkpoint.
 
@@ -62,6 +69,8 @@ replace it with counting hooks to verify balanced acquire/release calls.
 ```sh
 make test                 # runtime and handwritten dispatcher
 make test-compiler        # actual compiler: IR, O0/O2, flag off/on, execution
+python3 tests/compiler.py --lto full  # same fixture, full LTO
+python3 tests/compiler.py --lto thin  # same fixture, ThinLTO
 make check-patches       # patches reproduce the compiler source tree
 make bench               # build and measure all three paths
 ```

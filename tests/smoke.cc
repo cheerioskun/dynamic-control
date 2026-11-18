@@ -80,7 +80,9 @@ int main(int argc, char **) {
 
   auto *recursion = find("recursive");
   dc_enable(recursion);
-  check(recursive(5) == 120 && acquires == 8 && releases == 8, "recursive dispatch");
+  auto before = acquires.load();
+  check(recursive(5) == 120 && acquires > before && acquires == releases,
+        "recursive result and balanced hooks");
   dc_disable(recursion);
 
   auto *sum = find("sum10");
@@ -99,7 +101,7 @@ int main(int argc, char **) {
 
   disable_current = find("disable_self");
   dc_enable(disable_current);
-  auto before = acquires.load();
+  before = acquires.load();
   check(disable_self(7) == 8, "disable inside active invocation");
   check(acquires == before + 1 && releases == acquires,
         "active guard still releases after disable");
