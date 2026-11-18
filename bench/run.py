@@ -61,6 +61,7 @@ def main():
         "llvm_tree": output("git", "-C", "third_party/llvm", "rev-parse", "HEAD^{tree}"),
         "binary_sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(),
         "target_command": command_file.read_text().splitlines(),
+        "link_options": (args.binary.parent / "link-options.txt").read_text().splitlines(),
         "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                           for p in sources},
     }

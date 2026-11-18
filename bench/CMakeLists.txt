@@ -1,5 +1,6 @@
 set(DC_CLANG "${PROJECT_SOURCE_DIR}/build/llvm/bin/clang++" CACHE FILEPATH
     "Patched LLVM 23 compiler used only for benchmark targets")
+option(DC_LTO "Build targets, harness, and runtime with full LTO (use DC_CLANG as CXX)" OFF)
 if(NOT EXISTS "${DC_CLANG}")
   message(FATAL_ERROR "Patched clang++ not found; run make compiler first or set DC_CLANG")
 endif()
@@ -18,6 +19,10 @@ FetchContent_MakeAvailable(googlebenchmark)
 # benchmark library share the same fixed host compiler and build settings.
 set(target_object "${CMAKE_CURRENT_BINARY_DIR}/targets.o")
 set(target_flags -std=c++17 -O2 -fno-exceptions -fno-lto -mllvm -dc-enable)
+if(DC_LTO)
+  list(REMOVE_ITEM target_flags -fno-lto)
+  list(APPEND target_flags -flto=full)
+endif()
 if(APPLE)
   execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE dc_sdk
                   OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
@@ -34,6 +39,19 @@ set_target_properties(dc_bench PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
   INTERPROCEDURAL_OPTIMIZATION FALSE)
 target_link_libraries(dc_bench PRIVATE dynamic_control benchmark::benchmark)
+if(DC_LTO)
+  target_compile_options(dynamic_control PRIVATE -flto=full)
+  target_compile_options(dc_bench PRIVATE -flto=full)
+  target_link_options(dc_bench PRIVATE -flto=full)
+  get_filename_component(dc_tools "${DC_CLANG}" DIRECTORY)
+  if(APPLE)
+    target_link_options(dc_bench PRIVATE "-Wl,-lto_library,${dc_tools}/../lib/libLTO.dylib")
+  else()
+    target_link_options(dc_bench PRIVATE "-fuse-ld=${dc_tools}/ld.lld")
+  endif()
+endif()
+file(GENERATE OUTPUT "${PROJECT_BINARY_DIR}/link-options.txt"
+  CONTENT "${CMAKE_CXX_COMPILER}\n$<JOIN:$<TARGET_PROPERTY:dc_bench,LINK_OPTIONS>,\n>\n")
 string(JOIN "\n" target_command "${DC_CLANG}" ${target_flags}
        -c "${CMAKE_CURRENT_SOURCE_DIR}/targets.cc" -o "${target_object}")
 file(WRITE "${PROJECT_BINARY_DIR}/target-command.txt" "${target_command}\n")

@@ -55,20 +55,38 @@ cp build/llvm/bin/clang++.cfg "$run_dir/clang++.cfg"
 phase sanity
 make test
 make test-compiler
+if [ "${DC_LTO:-0}" = 1 ]; then
+    python3 tests/compiler.py --lto full
+    python3 tests/compiler.py --lto thin
+fi
 make check-patches
 
 phase benchmark-build
-cmake -S . -B build/bench -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DDC_BUILD_BENCH=ON -DBUILD_TESTING=OFF
-cmake --build build/bench --parallel "$DC_BUILD_JOBS"
-build/llvm/bin/llvm-objdump -d build/bench/bench/targets.o >"$run_dir/targets-disassembly.txt"
+bench_dir=build/bench
+bench_options=()
+if [ "${DC_LTO:-0}" = 1 ]; then
+    bench_dir=build/bench-lto
+    bench_options=(-DDC_LTO=ON "-DCMAKE_CXX_COMPILER=$root/build/llvm/bin/clang++"
+                   "-DCMAKE_AR=$root/build/llvm/bin/llvm-ar"
+                   "-DCMAKE_RANLIB=$root/build/llvm/bin/llvm-ranlib")
+fi
+cmake -S . -B "$bench_dir" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DDC_BUILD_BENCH=ON -DBUILD_TESTING=OFF "${bench_options[@]}"
+cmake --build "$bench_dir" --parallel "$DC_BUILD_JOBS"
+if [ "${DC_LTO:-0}" = 1 ]; then
+    build/llvm/bin/opt -S "$bench_dir/bench/targets.o" -o "$run_dir/targets.ll"
+else
+    build/llvm/bin/llvm-objdump -d "$bench_dir/bench/targets.o" >"$run_dir/targets-disassembly.txt"
+fi
 build/llvm/bin/llvm-objdump -d \
     --disassemble-symbols=bench_controlled,bench_controlled.dc_guard,dc_acquire,dc_release \
-    build/bench/dc_bench >"$run_dir/linked-disassembly.txt"
+    "$bench_dir/dc_bench" >"$run_dir/linked-disassembly.txt"
+cp "$bench_dir/dc_bench" "$run_dir/dc_bench"
+cp "$bench_dir/target-command.txt" "$bench_dir/link-options.txt" "$run_dir/"
 
 phase benchmark
 cpu=${DC_BENCH_CPU:-2}
 printf '%s\n' "$cpu" >"$run_dir/benchmark-cpu"
 taskset -c "$cpu" python3 bench/run.py --repetitions 7 --min-time 0.5s \
-    --output "$run_dir/results"
+    --binary "$bench_dir/dc_bench" --output "$run_dir/results"
 phase complete

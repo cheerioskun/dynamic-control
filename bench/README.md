@@ -41,6 +41,25 @@ and Gaussian sample generation happen before timing. It always allows entry,
 with no permit accounting or locking. The baseline is the unannotated function
 in the same binary. Earlier empty-hook results remain in [RESULTS.md](RESULTS.md).
 
+## Full LTO
+
+Use a separate build directory and LLVM 23 for the harness and runtime too.
+Google Benchmark remains a native library. `make compiler` builds the matching
+LTO library on macOS and LLD on Linux.
+
+```sh
+cmake -S . -B build/bench-lto -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_COMPILER="$PWD/build/llvm/bin/clang++" \
+  -DCMAKE_AR="$PWD/build/llvm/bin/llvm-ar" \
+  -DCMAKE_RANLIB="$PWD/build/llvm/bin/llvm-ranlib" \
+  -DDC_BUILD_BENCH=ON -DBUILD_TESTING=OFF -DDC_LTO=ON
+cmake --build build/bench-lto --parallel 2
+python3 bench/run.py --binary build/bench-lto/dc_bench
+```
+
+The compile-time `-mllvm -dc-enable` is unchanged. LTO may optimize away calls or
+inline copies before preparation; the annotation does not preserve them.
+
 ## Detached Linux node run
 
 From a checkout on the node, with GCC/G++, CMake, Ninja, LLD, Git, and Python:
@@ -58,3 +77,5 @@ chosen CPU. It uses seven randomized blocks with at least 0.5 seconds per sample
 The run directory holds `run.log`, `pid`, `phase`, `exit-code`, and `.done` on
 success or `.failed` on failure. Raw benchmark data is under `results/`.
 The built Clang uses a local `clang++.cfg` to select the host G++ library directory.
+Set `DC_LTO=1` in the launch environment to run the full-LTO fixture in
+`build/bench-lto/`, including the existing smoke fixture with full and ThinLTO.
