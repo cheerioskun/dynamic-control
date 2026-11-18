@@ -94,12 +94,19 @@ On `hemantp@pc475.emulab.net`, under `/users/hemantp/dynamic-control/`:
 |---|---|
 | `build/node-runs/20261117T190149Z/` | Empty-hook binary, logs, raw JSON, manifest, disassembly, `.done` |
 | `build/node-runs/20261117T214122Z-msem/` | Synthetic-msem binary and the same run artifacts |
+| `build/node-runs/20261118T031720Z-lto/` | Full-LTO synthetic-msem binary, logs, samples, disassembly, `.done` |
 
-Logs, JSON, and disassembly are also local under `build/node-runs/`; frozen x86
-binaries remain on the node. Mac runs are under `build/bench/results/`; their
+Logs, JSON, and disassembly are also local under `build/node-runs/`. The full-LTO
+x86 binary is copied locally too; earlier frozen x86 binaries remain on the node. Mac runs are under `build/bench/results/`; their
 exact directories are in the results page.
 Build output is ignored by Git. Download the frozen synthetic-msem x86 binary:
 
 ```sh
 scp hemantp@pc475.emulab.net:/users/hemantp/dynamic-control/build/node-runs/20261117T214122Z-msem/dc_bench ./dc_bench-x86_64
+```
+
+Download the frozen full-LTO x86 binary:
+
+```sh
+scp hemantp@pc475.emulab.net:/users/hemantp/dynamic-control/build/node-runs/20261118T031720Z-lto/dc_bench ./dc_bench-lto-x86_64
 ```

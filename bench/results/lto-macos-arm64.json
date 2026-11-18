@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-17",
+  "platform": "macos-arm64",
+  "cpu": "Apple M5",
+  "kernel": "25.5.0",
+  "logical_cpus": 10,
+  "cpu_affinity": null,
+  "hook_backend": "svalinn-synthetic-msem",
+  "mock_source": "svalinn-shenango/m-semaphore/bench/msem_bench.cc via mahoraga exp-15",
+  "synthetic_bandwidth": 175000.0,
+  "controller_interval_us": 3000,
+  "capacity_choices": 45,
+  "permit_accounting": false,
+  "locking": false,
+  "cpu_scaling_enabled": false,
+  "aslr_enabled": null,
+  "source_commit": "d30d250c4912ce5255a29b3f1f8df926d479a9c2",
+  "source_dirty": false,
+  "llvm_upstream_revision": "5b10d2d74929eae78912771222c9855af97496f4",
+  "llvm_commit": "fb6358c65aca1b06104e08449e923deef93b258d",
+  "llvm_tree": "f45aa67b47c6c3a522c93efce5b6a1177cda256c",
+  "host_compiler": "LLVM Clang 23.1.6",
+  "target_compiler": "23.1.6 (https://github.com/llvm/llvm-project.git 93745f0d8aea509c823a65183f9fda8be6dd59b6)",
+  "benchmark_version": "v1.10.0",
+  "benchmark_build_type": "release",
+  "repetitions_per_mode": 7,
+  "minimum_time": "0.2s",
+  "seed": 0,
+  "run_order": [
+    "baseline",
+    "hooked",
+    "unhooked",
+    "hooked",
+    "unhooked",
+    "baseline",
+    "baseline",
+    "unhooked",
+    "hooked",
+    "baseline",
+    "hooked",
+    "unhooked",
+    "baseline",
+    "hooked",
+    "unhooked",
+    "unhooked",
+    "baseline",
+    "hooked",
+    "unhooked",
+    "baseline",
+    "hooked"
+  ],
+  "binary_sha256": "beda439d037648b70ccef84f14e0f28e54c2e550f39b0c1bcbea90767782fadd",
+  "target_command": [
+    "/Users/hx/repos/dynamic-control/build/llvm/bin/clang++",
+    "-std=c++17",
+    "-O2",
+    "-fno-exceptions",
+    "-mllvm",
+    "-dc-enable",
+    "-flto=full",
+    "-isysroot",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+    "-c",
+    "/Users/hx/repos/dynamic-control/bench/targets.cc",
+    "-o",
+    "/Users/hx/repos/dynamic-control/build/bench-lto/bench/targets.o"
+  ],
+  "cpu_ns_per_call": {
+    "baseline": [
+      1.3555010343597171,
+      1.3582128236909496,
+      1.356735658772154,
+      1.3570070229177125,
+      1.3606669104061633,
+      1.3622197618117793,
+      1.3561023071913365
+    ],
+    "unhooked": [
+      1.25688756047577,
+      1.1198342412024227,
+      1.6408895084940955,
+      1.3052775951219,
+      1.1847466163747178,
+      1.0765683753592494,
+      1.2570748057625007
+    ],
+    "hooked": [
+      28.274346722455466,
+      28.317576713255324,
+      28.60084863408123,
+      28.411088990397893,
+      28.33252781286021,
+      28.62473825345017,
+      28.981569184703773
+    ]
+  },
+  "median_cpu_ns_per_call": {
+    "baseline": 1.3570070229177125,
+    "unhooked": 1.25688756047577,
+    "hooked": 28.411088990397893
+  },
+  "range_cpu_ns_per_call": {
+    "baseline": [
+      1.3555010343597171,
+      1.3622197618117793
+    ],
+    "unhooked": [
+      1.0765683753592494,
+      1.6408895084940955
+    ],
+    "hooked": [
+      28.274346722455466,
+      28.981569184703773
+    ]
+  },
+  "unhooked_minus_baseline_ns": -0.10011946244194236,
+  "hooked_minus_unhooked_ns": 27.15420142992212,
+  "source_sha256": {
+    "runtime/CMakeLists.txt": "d0a6e8b7158e034bb0b418a0c4326d3bdfdce40a4f221be1764e6160207122f2",
+    "runtime/msem_mock.h": "bdddf41e3aaf977b1fe5de6a12c95f83f611716d97822e711c9c912e1450a249",
+    "runtime/dynamic_control.h": "57f4d6d60955ba995e098a3d078e38037e0ca26b1b6db2228d34a08af805da86",
+    "runtime/LICENSE.svalinn-shenango": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "runtime/msem_mock.md": "ca9de9fe98f949f5970b786fc445ba3af2c56db2029c9e661f5c7bb40bce8e3a",
+    "runtime/msem_mock.cc": "e20ab6d8f196e6006cd84c178b91dae5f30e2c96a5776f8f281525a1046c78dc",
+    "runtime/dynamic_control.cc": "61f14e7fa6498a3d25ff0031434c19c16346a1a27ebc6500d989e214262a8297",
+    "bench/run.py": "f9f83f3117f90a9a90dbfa123dc6101226d909be55299d5f4843e6173084db78",
+    "bench/CMakeLists.txt": "feddaf01c5dfd2395c3799156393c821bf7ab872f3fec018432ffbb18787558c",
+    "bench/bench.cc": "c09a71f1c568658c266d8708236963b22a5f7be6099773093ec757bb1d377772",
+    "bench/README.md": "a874833bbbd650676e2102521924c5b517ca2de50cfc2c18f4f625bab34616b2",
+    "bench/RESULTS.md": "011e37f67840cdf04c40c8f72e8638457832297796339dd82029e62e98274bfb",
+    "bench/targets.cc": "0a3d184c8750de5b63c95a672571d357f0436852af577daf0498f6e0c96369dc",
+    "CMakeLists.txt": "670a803c3d1069d1ef546e26b3427a44839f67d99a70a4e6a2e92d6d779daffd",
+    "toolchain.json": "7bf0209b9a93f2a16d77bf279fc50f2f5289e33f034c59ab42595aa42915e906",
+    "patches/llvm/series": "f1fe300a999df986e1eafe1073babe20eac5247fca0cd8184137f1e143be1a0f",
+    "patches/llvm/0002-Prepare-surviving-annotated-definitions-after-per-fi.patch": "af4359c9396e24d4c9e0b5c7eb7d35c163111a488449a1aea28a5e8545e6024d",
+    "patches/llvm/0001-Add-annotated-atomic-function-dispatch-and-permit-gu.patch": "61a0f1449e029ee8ba781805393d454354a62dce92003aa5ea31134203bd1760"
+  },
+  "raw_directory": "build/bench/results/lto-macos-arm64-20261117",
+  "interpretation": "Serial arithmetic fixture, including loop, guard, two real clock checks, and amortized controller work. Synthetic bandwidth; acquire always allows entry. Differences are between medians.",
+  "started_utc": "20261118T031202.777178Z",
+  "link_options": [
+    "/Users/hx/repos/dynamic-control/build/llvm/bin/clang++",
+    "-flto=full",
+    "-Wl,-lto_library,/Users/hx/repos/dynamic-control/build/llvm/bin/../lib/libLTO.dylib"
+  ],
+  "lto": "full",
+  "lto_scope": [
+    "targets",
+    "harness",
+    "runtime",
+    "msem_mock"
+  ],
+  "google_benchmark_lto": false
+}

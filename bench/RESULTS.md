@@ -1,5 +1,40 @@
 # Prototype sanity measurements
 
+## Full LTO, annotation as a hint
+
+2026-11-17. The pass now runs after per-file optimization, before LTO. It prepares
+remaining annotated definitions; it does not preserve calls or instrument copies
+already inlined. Full and ThinLTO pass the existing O0/O2 execution fixture with
+preparation off/on. The benchmark below uses **full LTO** for targets, harness,
+runtime, and synthetic msem mock; Google Benchmark v1.10.0 remains native.
+LLVM Clang 23 compiles the whole fixture, including the harness/runtime that used
+host compilers in earlier runs. These are new builds, not an isolated measurement
+of changing only the LTO flag.
+
+Seven randomized blocks, one process per case. M5: minimum 0.2 s per sample.
+Xeon E5530: minimum 0.5 s, pinned to CPU 2; scaling and ASLR enabled.
+
+| Machine | Path | Median CPU ns/call | Min–max CPU ns/call |
+|---|---|---:|---:|
+| Xeon E5530 | Baseline | 2.636 | 2.628–2.639 |
+| Xeon E5530 | Unhooked | 3.017 | 3.016–3.019 |
+| Xeon E5530 | Hooked | 73.960 | 73.927–75.557 |
+| Apple M5 | Baseline | 1.357 | 1.356–1.362 |
+| Apple M5 | Unhooked | 1.257 | 1.077–1.641 |
+| Apple M5 | Hooked | 28.411 | 28.274–28.982 |
+
+Hooked minus unhooked is **70.943 ns/call on the Xeon** and **27.154 ns/call on
+the M5**, between medians. Xeon unhooked minus baseline is 0.381 ns in this run;
+M5 unhooked variance leaves its dispatch penalty unresolved. Final linked assembly retains
+the acquire-load and indirect branch, the guard's acquire/body/release calls,
+and both timed target calls. The synthetic controller and clock checks remain.
+
+Saved samples and provenance: [Xeon](results/lto-linux-x86_64.json),
+[M5](results/lto-macos-arm64.json). The Xeon run completed with `.done`, exit 0.
+Its frozen binary, logs, JSON, and disassembly are on the node and locally under
+`build/node-runs/20261118T031720Z-lto/`. Mac artifacts and binary are under
+`build/bench/results/lto-macos-arm64-20261117/`.
+
 ## Synthetic Svalinn msem
 
 2026-11-17. The [portable Svalinn controller](../runtime/msem_mock.md) replaces
