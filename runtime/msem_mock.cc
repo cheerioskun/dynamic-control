@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -11,7 +12,8 @@
 
 // Adapted from svalinn-shenango/m-semaphore/bench/msem_bench.cc via exp-15.
 // See msem_mock.md for source revisions and the retained synthetic behavior.
-// Single-threaded, always-allow fixture; no permit accounting or locking.
+// Always-allow fixture; nesting is tracked per thread, with no capacity
+// enforcement or locking. The synthetic controller remains single-threaded.
 namespace {
 constexpr std::uint32_t MAX_CORES = 45;
 constexpr std::uint64_t CTL_DELAY_US = 3000;
@@ -121,6 +123,7 @@ void MemSemaphoreHandle::update_capacity() {
 
 namespace {
 MemSemaphoreHandle mock;
+thread_local unsigned permit_depth = 0;
 }
 
 extern "C" void dc_msem_mock_init() noexcept {
@@ -140,13 +143,24 @@ extern "C" void dc_msem_mock_init() noexcept {
 
 extern "C" __attribute__((noinline))
 void dc_acquire(const DcFunction *) noexcept {
-    mock.update_capacity();
-    // Keep the controller's state observable across optimization.
-    asm volatile("" : : "r"(&mock) : "memory");
+    if (permit_depth == 0) {
+        mock.update_capacity();
+        // Keep the controller's state observable across optimization.
+        asm volatile("" : : "r"(&mock) : "memory");
+    }
+    ++permit_depth;
 }
 
 extern "C" __attribute__((noinline))
 void dc_release(const DcFunction *) noexcept {
-    mock.update_capacity();
-    asm volatile("" : : "r"(&mock) : "memory");
+    assert(permit_depth != 0);
+    if (permit_depth == 1) {
+        mock.update_capacity();
+        asm volatile("" : : "r"(&mock) : "memory");
+    }
+    --permit_depth;
+}
+
+extern "C" bool dc_has_memory_permit() noexcept {
+    return permit_depth != 0;
 }

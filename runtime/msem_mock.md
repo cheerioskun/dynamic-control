@@ -9,11 +9,14 @@ The imported code retains [Svalinn's Apache 2.0 license](LICENSE.svalinn-shenang
 It retains synthetic bandwidth of 175000, 45 capacity choices, a ten-sample
 reward window, softmax exploration, and Thompson sampling from 2^18
 pre-generated Gaussian values. Posterior parameters stay fixed, as in the
-optimized benchmark. Seeds are zero. Each acquire and release checks the real
-steady clock; controller work runs at most once every 3000 microseconds.
+optimized benchmark. Seeds are zero. Each outermost acquire and release checks
+the real steady clock; controller work runs at most once every 3000 microseconds.
 
 The benchmark calls `dc_msem_mock_init()` before timing. The hooks share one
-state record and always grant entry, without permit accounting or locking.
+state record and always grant entry, without capacity enforcement or locking.
+An OS-thread-local nesting counter skips controller work for nested guarded
+calls, including recursion. Only the outermost return releases the logical
+permit; `dc_has_memory_permit()` reports whether the counter is nonzero.
 This is the single-threaded portable fixture, with no PCM or Shenango dependency.
 The controller's learned capacity is calculated but does not gate entry.
 
