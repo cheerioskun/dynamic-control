@@ -42,13 +42,9 @@ const DcFunction *dc_find(const char *name) DC_NOEXCEPT;
 void dc_enable(const DcFunction *function) DC_NOEXCEPT;
 void dc_disable(const DcFunction *function) DC_NOEXCEPT;
 
-// Hooks nest per OS thread across all functions: only the outermost pair
-// acquires/releases a permit. Calls must return normally and remain on the
-// same thread. The synthetic Svalinn mock always allows entry.
+// Supplied by the application or benchmark backend.
 void dc_acquire(const DcFunction *function) DC_NOEXCEPT;
 void dc_release(const DcFunction *function) DC_NOEXCEPT;
-// False while waiting for acquisition; true until outermost release completes.
-bool dc_has_memory_permit(void) DC_NOEXCEPT;
 
 #ifdef __cplusplus
 }

@@ -23,7 +23,7 @@ make bench
 `DC_BUILD_JOBS` controls compiler build parallelism (default 2). The compiler
 builds the native backend. See [development](docs/development.md) for the patch
 workflow and local tool installation, and [benchmarks](bench/README.md) for the
-three-path fixture and detached node runner.
+empty-hook microbenchmark.
 
 ## Select and toggle functions
 
@@ -53,8 +53,8 @@ and execute their release hook.
 
 ## Measurements and source
 
-[Results](bench/RESULTS.md) include samples and disassembly checks. The fixture
-measures baseline, unhooked, and hooked calls in one binary.
+[Hook-overhead results](results/hook-overhead/README.md) compare baseline,
+unhooked, and empty-hook calls. The microbenchmark code lives in `bench/`.
 
 LLVM stays pinned to unmodified upstream source. Compiler edits are committed
 locally inside the submodule and exported to `patches/llvm/`, following

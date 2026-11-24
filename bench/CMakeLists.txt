@@ -15,7 +15,7 @@ FetchContent_Declare(googlebenchmark
   URL_HASH SHA256=acc5c7c0fbed855c4aaa2d7c3c36fb82b0c15c28f4e151e3f679c2fc0aa404af)
 FetchContent_MakeAvailable(googlebenchmark)
 
-# Only targets.cc goes through the extension. Harness, runtime, mock, and
+# Only targets.cc goes through the extension. Harness, runtime, and
 # benchmark library share the same fixed host compiler and build settings.
 set(target_object "${CMAKE_CURRENT_BINARY_DIR}/targets.o")
 set(target_flags -std=c++17 -O2 -fno-exceptions -fno-lto -mllvm -dc-enable)
@@ -34,7 +34,7 @@ add_custom_command(OUTPUT "${target_object}"
   DEPENDS targets.cc "${DC_CLANG}"
   VERBATIM)
 set_source_files_properties("${target_object}" PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
-add_executable(dc_bench bench.cc "${target_object}")
+add_executable(dc_bench bench.cc empty_hooks.cc "${target_object}")
 set_target_properties(dc_bench PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
   INTERPROCEDURAL_OPTIMIZATION FALSE)
@@ -50,8 +50,3 @@ if(DC_LTO)
     target_link_options(dc_bench PRIVATE "-fuse-ld=${dc_tools}/ld.lld")
   endif()
 endif()
-file(GENERATE OUTPUT "${PROJECT_BINARY_DIR}/link-options.txt"
-  CONTENT "${CMAKE_CXX_COMPILER}\n$<JOIN:$<TARGET_PROPERTY:dc_bench,LINK_OPTIONS>,\n>\n")
-string(JOIN "\n" target_command "${DC_CLANG}" ${target_flags}
-       -c "${CMAKE_CURRENT_SOURCE_DIR}/targets.cc" -o "${target_object}")
-file(WRITE "${PROJECT_BINARY_DIR}/target-command.txt" "${target_command}\n")

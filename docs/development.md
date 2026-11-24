@@ -49,4 +49,4 @@ HEAD. `python3 scripts/llvm.py export` exports manually. Setup preserves local
 source edits; checks use an isolated index. Run `make setup` in every clone to
 activate the hooks.
 
-For a detached Linux build and benchmark, see [the node runner](../bench/README.md#detached-linux-node-run).
+For the empty-hook microbenchmark, see [bench](../bench/README.md).

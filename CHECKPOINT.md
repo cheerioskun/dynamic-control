@@ -17,7 +17,7 @@ using the real semaphore without permit TLS.
 | [DynamicControl.cpp](third_party/llvm/llvm/lib/Transforms/Instrumentation/DynamicControl.cpp) | Annotation selection, body cloning, guard, dispatcher, address table |
 | [runtime/dynamic_control.h](runtime/dynamic_control.h) and [.cc](runtime/dynamic_control.cc) | Two records and registration/find/enable/disable |
 | [bench/bench.cc](bench/bench.cc) | Same timed loop, three modes, setup outside timing |
-| [runtime/msem_mock.cc](runtime/msem_mock.cc) | Copied synthetic controller; [provenance and behavior](runtime/msem_mock.md) |
+| [bench/empty_hooks.cc](bench/empty_hooks.cc) | Empty acquire/release calls for the microbenchmark |
 
 The compiler source appears after `make setup`. Its published form is the
 patch series in [patches/llvm/series](patches/llvm/series).
@@ -64,11 +64,6 @@ unique linkage names, valid handles, startup registration, and modules
 remaining loaded. Broad selection, binary patching, and real permit policy are
 outside this checkpoint.
 
-The Svalinn mock checks the steady clock on both hooks and runs its controller
-every 3 ms using synthetic bandwidth. Initialization is outside timing. It
-always grants entry, with no permit accounting or locks. The compiler fixtures
-replace it with counting hooks to verify balanced acquire/release calls.
-
 ## Verify
 
 ```sh
@@ -86,32 +81,7 @@ and inspection of the final assembly establish that dispatch and hooks survive
 optimization. Patch tooling follows LDB; [development commands](docs/development.md)
 cover it separately from the runtime.
 
-## Saved artifacts
+## Results
 
-[bench/RESULTS.md](bench/RESULTS.md) contains both empty-hook and synthetic-msem
-measurements on M5 and Xeon, with samples and source/binary hashes in
-`bench/results/*.json`. Each reported result names the source commit measured;
-the cleanup checkpoint does not relabel or replace those measurements.
-
-On `hemantp@pc475.emulab.net`, under `/users/hemantp/dynamic-control/`:
-
-| Directory | Contents |
-|---|---|
-| `build/node-runs/20261117T190149Z/` | Empty-hook binary, logs, raw JSON, manifest, disassembly, `.done` |
-| `build/node-runs/20261117T214122Z-msem/` | Synthetic-msem binary and the same run artifacts |
-| `build/node-runs/20261118T031720Z-lto/` | Full-LTO synthetic-msem binary, logs, samples, disassembly, `.done` |
-
-Logs, JSON, and disassembly are also local under `build/node-runs/`. The full-LTO
-x86 binary is copied locally too; earlier frozen x86 binaries remain on the node. Mac runs are under `build/bench/results/`; their
-exact directories are in the results page.
-Build output is ignored by Git. Download the frozen synthetic-msem x86 binary:
-
-```sh
-scp hemantp@pc475.emulab.net:/users/hemantp/dynamic-control/build/node-runs/20261117T214122Z-msem/dc_bench ./dc_bench-x86_64
-```
-
-Download the frozen full-LTO x86 binary:
-
-```sh
-scp hemantp@pc475.emulab.net:/users/hemantp/dynamic-control/build/node-runs/20261118T031720Z-lto/dc_bench ./dc_bench-lto-x86_64
-```
+- [Hook overhead](results/hook-overhead/README.md): empty-hook microbenchmarks on M5 and Xeon.
+- [Netbench on Shenango](results/netbench-shenango/README.md): correctness and performance against hardcoded blocking instrumentation.

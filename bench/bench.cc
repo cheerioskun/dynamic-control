@@ -1,5 +1,4 @@
 #include "dynamic_control.h"
-#include "msem_mock.h"
 #include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdio>
@@ -36,7 +35,6 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "Usage: %s --dc-mode=baseline|unhooked|hooked [benchmark options]\n", argv[0]);
     return 1;
   }
-  dc_msem_mock_init();
   const DcFunction *function = dc_find("bench_controlled");
   if (!function || dc_find("bench_plain")) {
     std::fprintf(stderr, "Expected exactly the annotated target to be registered\n");
@@ -51,7 +49,7 @@ int main(int argc, char **argv) {
                                                  : &BM_Call<bench_controlled>;
   benchmark::RegisterBenchmark(mode, loop)->Unit(benchmark::kNanosecond);
   benchmark::AddCustomContext("dc_mode", mode);
-  benchmark::AddCustomContext("hook_backend", "svalinn-synthetic-msem");
+  benchmark::AddCustomContext("hook_backend", "empty");
   benchmark::AddCustomContext("target_compiler", bench_target_compiler());
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv))
