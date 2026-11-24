@@ -1,5 +1,0 @@
-clang version 23.1.6 (https://github.com/llvm/llvm-project.git 793dee457cb5713d3fb207b28294ac0316f8a9e8)
-Target: x86_64-unknown-linux-gnu
-Thread model: posix
-InstalledDir: /users/hemantp/dynamic-control/build/llvm/bin
-Build config: +assertions

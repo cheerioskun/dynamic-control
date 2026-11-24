@@ -4,13 +4,10 @@ The prototype prepares annotated functions and toggles hooks for future entries.
 It is an LLVM IR pass, a small runtime, and a three-path Google Benchmark fixture.
 LLVM is 23.1.6. There are no frame-lowering changes.
 
-The [Shenango experiment](experiments/shenango/README.md) extends the prototype
-to netbench with a real blocking semaphore and no permit TLS. Its two checks
-are correctness parity with explicit `Wait()/work/Post()` and similar
-performance. The compiler and application are both upstream-pinned submodules
-with patch series; this repository owns the experiment evidence. The reports
-retain their original measured revisions and limitations. The prototype-only
-design and mock measurements below remain their own evidence.
+The application comparison is recorded in
+[results/netbench-shenango](results/netbench-shenango/README.md): correctness
+parity with hardcoded `Wait()/work/Post()` and similar observed performance,
+using the real semaphore without permit TLS.
 
 ## Read in this order
 

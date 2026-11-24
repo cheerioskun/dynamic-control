@@ -13,11 +13,6 @@ PROJECT = Path(__file__).resolve().parents[2]
 
 
 class LLVMWorkflow(unittest.TestCase):
-    dependency = "llvm"
-    metadata_file = "toolchain.json"
-    driver = "llvm"
-    sparse_paths = ["llvm"]
-
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="dc-workflow-test-")
         self.addCleanup(self.tmp.cleanup)
@@ -46,13 +41,13 @@ class LLVMWorkflow(unittest.TestCase):
         self.git(self.root, "init", "-b", "main")
         shutil.copytree(PROJECT / "scripts", self.root / "scripts")
         shutil.copytree(PROJECT / ".githooks", self.root / ".githooks")
-        self.git(self.root, "submodule", "add", str(self.upstream), f"third_party/{self.dependency}")
-        self.sub = self.root / f"third_party/{self.dependency}"
-        (self.root / f"patches/{self.dependency}").mkdir(parents=True)
-        (self.root / f"patches/{self.dependency}/series").write_text("")
+        self.git(self.root, "submodule", "add", str(self.upstream), "third_party/llvm")
+        self.sub = self.root / "third_party/llvm"
+        (self.root / "patches/llvm").mkdir(parents=True)
+        (self.root / "patches/llvm/series").write_text("")
         (self.root / "README.md").write_text("baseline\n")
-        (self.root / self.metadata_file).write_text(json.dumps({
-            "llvm_major": 23, "upstream_revision": self.base, "sparse_paths": self.sparse_paths,
+        (self.root / "toolchain.json").write_text(json.dumps({
+            "llvm_major": 23, "upstream_revision": self.base, "sparse_paths": ["llvm"],
         }))
         self.git(self.root, "add", ".")
         self.git(self.root, "commit", "-m", "Initial project")
@@ -69,7 +64,7 @@ class LLVMWorkflow(unittest.TestCase):
 
     def tool(self, command, ok=True, root=None):
         root = root or self.root
-        return self.run_cmd([sys.executable, str(root / f"scripts/{self.driver}.py"), command], root, ok)
+        return self.run_cmd([sys.executable, str(root / "scripts/llvm.py"), command], root, ok)
 
     def change(self, value=1):
         (self.sub / "llvm/example.c").write_text(f"int example = {value};\n")
@@ -77,11 +72,9 @@ class LLVMWorkflow(unittest.TestCase):
         self.git(self.sub, "commit", "-m", f"Change LLVM to {value}")
 
     def test_setup_expands_sparse_paths_without_losing_development_edits(self):
-        if self.sparse_paths is None:
-            self.skipTest("Shenango keeps the full source checkout")
         source = self.sub / "llvm/example.c"
         source.write_text("int unfinished_edit = 1;\n")
-        metadata = self.root / self.metadata_file
+        metadata = self.root / "toolchain.json"
         info = json.loads(metadata.read_text())
         info["sparse_paths"].append("cmake")
         metadata.write_text(json.dumps(info))
@@ -103,15 +96,15 @@ class LLVMWorkflow(unittest.TestCase):
         self.assertEqual(self.git(self.root, "show", "HEAD:README.md").stdout, "baseline\nstaged\n")
         self.assertIn("unstaged", readme.read_text())
         self.assertIn("?? unrelated.txt", self.git(self.root, "status", "--short").stdout)
-        self.assertEqual(self.git(self.root, "rev-parse", f"HEAD:third_party/{self.dependency}").stdout.strip(), self.base)
-        self.assertTrue(list((self.root / f"patches/{self.dependency}").glob("*.patch")))
+        self.assertEqual(self.git(self.root, "rev-parse", "HEAD:third_party/llvm").stdout.strip(), self.base)
+        self.assertTrue(list((self.root / "patches/llvm").glob("*.patch")))
         self.tool("check")
 
     def test_parent_commit_can_contain_only_automatic_llvm_export(self):
         self.change()
-        self.assertIn(f"patches/{self.dependency}", self.git(self.root, "diff", "--cached", "--name-only").stdout)
+        self.assertIn("patches/llvm", self.git(self.root, "diff", "--cached", "--name-only").stdout)
         self.parent_commit()
-        self.assertIn(f"patches/{self.dependency}", self.git(self.root, "show", "--stat", "HEAD").stdout)
+        self.assertIn("patches/llvm", self.git(self.root, "show", "--stat", "HEAD").stdout)
 
     def test_dirty_llvm_blocks_commit_without_changing_source_or_index(self):
         (self.sub / "llvm/example.c").write_text("uncommitted\n")
@@ -130,7 +123,7 @@ class LLVMWorkflow(unittest.TestCase):
 
     def test_accidentally_staged_development_pin_is_rejected(self):
         self.change()
-        self.git(self.root, "add", f"third_party/{self.dependency}")
+        self.git(self.root, "add", "third_party/llvm")
         result = self.tool("hook", ok=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("pin differs", result.stderr)
@@ -138,7 +131,7 @@ class LLVMWorkflow(unittest.TestCase):
     def test_manual_patch_edits_are_not_overwritten(self):
         self.change()
         self.parent_commit()
-        patch = next((self.root / f"patches/{self.dependency}").glob("*.patch"))
+        patch = next((self.root / "patches/llvm").glob("*.patch"))
         patch.write_text(patch.read_text() + "manual edit\n")
         result = self.tool("export", ok=False)
         self.assertNotEqual(result.returncode, 0)
@@ -148,11 +141,11 @@ class LLVMWorkflow(unittest.TestCase):
         self.change(1)
         self.change(2)
         self.parent_commit()
-        self.assertEqual(len(list((self.root / f"patches/{self.dependency}").glob("*.patch"))), 2)
+        self.assertEqual(len(list((self.root / "patches/llvm").glob("*.patch"))), 2)
         self.git(self.sub, "reset", "--soft", self.base)
         self.git(self.sub, "commit", "-m", "Consolidate LLVM changes")
         self.parent_commit()
-        self.assertEqual(len(list((self.root / f"patches/{self.dependency}").glob("*.patch"))), 1)
+        self.assertEqual(len(list((self.root / "patches/llvm").glob("*.patch"))), 1)
         self.tool("check")
 
     def test_setup_is_idempotent_and_preserves_developer_edits(self):
@@ -171,7 +164,7 @@ class LLVMWorkflow(unittest.TestCase):
         self.git(self.home, "clone", str(self.root), str(replica))
         self.tool("setup", root=replica)
         expected = self.git(self.sub, "rev-parse", "HEAD^{tree}").stdout
-        actual = self.git(replica / f"third_party/{self.dependency}", "rev-parse", "HEAD^{tree}").stdout
+        actual = self.git(replica / "third_party/llvm", "rev-parse", "HEAD^{tree}").stdout
         self.assertEqual(actual, expected)
         self.tool("check", root=replica)
         self.tool("hook", root=replica)
@@ -181,25 +174,13 @@ class LLVMWorkflow(unittest.TestCase):
     def test_corrupt_staged_patch_fails_reconstruction_without_source_changes(self):
         self.change()
         self.parent_commit()
-        patch = next((self.root / f"patches/{self.dependency}").glob("*.patch"))
+        patch = next((self.root / "patches/llvm").glob("*.patch"))
         patch.write_text(patch.read_text().replace("-int example = 0;", "-int example = 999;"))
-        self.git(self.root, "add", f"patches/{self.dependency}")
+        self.git(self.root, "add", "patches/llvm")
         head = self.git(self.sub, "rev-parse", "HEAD").stdout
         self.assertNotEqual(self.tool("check", ok=False).returncode, 0)
         self.assertEqual(self.git(self.sub, "rev-parse", "HEAD").stdout, head)
         self.assertEqual(self.git(self.sub, "status", "--porcelain").stdout, "")
-
-
-class ShenangoWorkflow(LLVMWorkflow):
-    dependency = "svalinn-shenango"
-    metadata_file = "shenango.json"
-    driver = "shenango"
-    sparse_paths = None
-
-    def test_setup_keeps_the_full_application_checkout(self):
-        self.assertTrue((self.sub / "llvm/example.c").is_file())
-        self.assertTrue((self.sub / "cmake/example.cmake").is_file())
-        self.assertNotEqual(self.git(self.sub, "config", "--get", "core.sparseCheckout", ok=False).stdout.strip(), "true")
 
 
 if __name__ == "__main__":

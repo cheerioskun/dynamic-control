@@ -1,8 +1,0 @@
-#!/bin/sh
-set -eu
-project_root=$(git rev-parse --show-superproject-working-tree)
-if [ -z "$project_root" ]; then
-    echo "dynamic-control: Shenango checkout is not attached to the parent project" >&2
-    exit 1
-fi
-exec python3 "$project_root/scripts/shenango.py" post-commit

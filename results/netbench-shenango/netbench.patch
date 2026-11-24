@@ -1,0 +1,221 @@
+diff --git a/breakwater/apps/netbench/src/Makefile b/breakwater/apps/netbench/src/Makefile
+index c40e513..f26e862 100644
+--- a/breakwater/apps/netbench/src/Makefile
++++ b/breakwater/apps/netbench/src/Makefile
+@@ -1,6 +1,6 @@
+ # Makefile for netbench
+ ROOT_PATH=../../../../
+-BUILD_PATH = ../build
++BUILD_PATH ?= ../build
+ include $(ROOT_PATH)/build/shared.mk
+ 
+ INC += -I./
+@@ -18,7 +18,7 @@ libbwpp = $(ROOT_PATH)/breakwater/bindings/cc/libbw++.a
+ libmsem = $(ROOT_PATH)/m-semaphore/build/libmsem.a
+ libpcm = $(ROOT_PATH)/m-semaphore/deps/pcm/build/src/libpcm.a
+ 
+-lib_src = synthetic_worker.cc util.cc
++lib_src = synthetic_worker.cc util.cc memory_control.cc
+ lib_obj = $(patsubst %.cc,$(BUILD_PATH)/%.o,$(lib_src))
+ 
+ netbench_src = netbench.cc
+@@ -48,7 +48,7 @@ $(netbench_ms_tgt): $(lib_obj) $(netbench_ms_obj) $(librt) $(libbw) $(libbwpp) $
+ # general build rules for all targets
+ src = $(lib_src) $(netbench_src) $(netbench_ms_src)
+ obj = $(BUILD_PATH)/$(src:.cc=.o)
+-dep = $(BUILD_PATH)/$(obj:.o=.d)
++dep = $(obj:.o=.d)
+ 
+ ifneq ($(MAKECMDGOALS),clean)
+ -include $(dep)   # include all dep files in the makefile
+diff --git a/breakwater/apps/netbench/src/Makefile.parity b/breakwater/apps/netbench/src/Makefile.parity
+new file mode 100644
+index 0000000..e61d345
+--- /dev/null
++++ b/breakwater/apps/netbench/src/Makefile.parity
+@@ -0,0 +1,28 @@
++# Hardcoded and compiler-generated control around the same netbench work.
++MODE ?= hardcoded
++DC_ROOT ?= $(abspath $(ROOT_PATH)/../..)
++DC_CXX ?= $(DC_ROOT)/build/llvm/bin/clang++
++BUILD_PATH := ../build-parity/$(MODE)
++include Makefile
++INC += -I$(DC_ROOT)/runtime
++
++ifeq ($(filter $(MODE),hardcoded auto),)
++$(error MODE must be hardcoded or auto)
++endif
++CXX := $(DC_CXX)
++LDXX := $(DC_CXX)
++# The AMD test machine has neither AVX-512 nor user interrupts.
++FLAGS := $(filter-out -mavx512f -muintr -flto,$(FLAGS)) -march=znver2
++LDFLAGS := $(filter-out -flto,$(LDFLAGS))
++ifeq ($(MODE),auto)
++$(BUILD_PATH)/memory_control.o: CXXFLAGS += -DNETBENCH_DC_AUTO -mllvm -dc-enable
++lib_obj += $(BUILD_PATH)/dynamic_control.o
++endif
++
++.DEFAULT_GOAL := parity
++.PHONY: parity
++parity: $(netbench_tgt)
++$(netbench_tgt): $(lib_obj)
++$(BUILD_PATH)/dynamic_control.o: $(DC_ROOT)/runtime/dynamic_control.cc $(DC_ROOT)/runtime/dynamic_control.h
++	@mkdir -p $(BUILD_PATH)
++	$(CXX) $(CXXFLAGS) -c $< -o $@
+diff --git a/breakwater/apps/netbench/src/memory_control.cc b/breakwater/apps/netbench/src/memory_control.cc
+new file mode 100644
+index 0000000..8c779c1
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control.cc
+@@ -0,0 +1,65 @@
++#include "memory_control.h"
++#include "synthetic_worker.h"
++#include "m_semaphore.hpp"
++
++extern "C" {
++#include <runtime/thread.h>
++}
++
++#ifdef NETBENCH_DC_AUTO
++#include "dynamic_control.h"
++#endif
++
++namespace {
++MemSemaphore *semaphore;
++#ifdef NETBENCH_DC_AUTO
++const DcFunction *descriptor;
++#endif
++
++void Acquire() noexcept {
++  semaphore->Wait();
++}
++
++void Release() noexcept {
++  semaphore->Post();
++}
++}  // namespace
++
++#ifdef NETBENCH_DC_AUTO
++extern "C" void dc_acquire(const DcFunction *) noexcept { Acquire(); }
++extern "C" void dc_release(const DcFunction *) noexcept { Release(); }
++#define MEMORY_BOUNDARY __attribute__((annotate("dc"), noinline))
++#else
++#define MEMORY_BOUNDARY __attribute__((noinline))
++#endif
++
++extern "C" MEMORY_BOUNDARY void
++netbench_memory_work(SyntheticWorker **workers, uint64_t iterations) noexcept {
++#ifndef NETBENCH_DC_AUTO
++  if (semaphore) Acquire();
++#endif
++  workers[get_current_affinity()]->Work(iterations);
++#ifndef NETBENCH_DC_AUTO
++  if (semaphore) Release();
++#endif
++}
++
++bool NetbenchMemoryControlInit(bool enabled) noexcept {
++  semaphore = enabled ? MemSemaphore::GetInstance() : nullptr;
++#ifdef NETBENCH_DC_AUTO
++  descriptor = dc_find("netbench_memory_work");
++  if (!descriptor) return false;  // Never silently run an unprepared build.
++  if (enabled) dc_enable(descriptor);
++  else dc_disable(descriptor);
++#endif
++  return true;
++}
++
++const char *NetbenchMemoryControlMode() noexcept {
++#ifdef NETBENCH_DC_AUTO
++  return "autoinstrumented";
++#else
++  return "hardcoded";
++#endif
++}
++
+diff --git a/breakwater/apps/netbench/src/memory_control.h b/breakwater/apps/netbench/src/memory_control.h
+new file mode 100644
+index 0000000..954eecc
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control.h
+@@ -0,0 +1,15 @@
++#pragma once
++
++#include <cstdint>
++
++class SyntheticWorker;
++
++// Called inside Shenango, before request threads start. Both builds use the
++// existing MemSemaphore singleton; the auto build also publishes its guard.
++bool NetbenchMemoryControlInit(bool enabled) noexcept;
++const char *NetbenchMemoryControlMode() noexcept;
++
++// workers is indexed after acquisition, because Wait may migrate the thread.
++extern "C" void netbench_memory_work(SyntheticWorker **workers,
++                                      uint64_t iterations) noexcept;
++
+diff --git a/breakwater/apps/netbench/src/netbench.cc b/breakwater/apps/netbench/src/netbench.cc
+index 4931698..1a9a9f5 100644
+--- a/breakwater/apps/netbench/src/netbench.cc
++++ b/breakwater/apps/netbench/src/netbench.cc
+@@ -20,6 +20,7 @@ extern "C" {
+ #include "breakwater/msem++.h"
+ 
+ #include "synthetic_worker.h"
++#include "memory_control.h"
+ #include "loadbalancer.h"
+ #include "fanouter.h"
+ #include "m_semaphore.hpp"
+@@ -95,8 +96,6 @@ constexpr uint64_t kExperimentTime = 8000000;
+ // RTT
+ constexpr uint64_t kRTT = 10;
+ constexpr uint64_t kNumDupClient = 32;
+-// Use blocking msemaphore
+-const bool use_blocking_msem = false;
+ 
+ std::vector<double> offered_loads;
+ double offered_load;
+@@ -605,30 +604,7 @@ void RpcServer(struct srpc_ctx *ctx) {
+   if (in->req_type == CPU_BOUND) {
+     cpu_bound_workers[core_id]->Work(workn);
+   } else if (in->req_type == MEM_BOUND) {
+-    if (!use_msem) {
+-      mem_bound_workers[core_id]->Work(workn);
+-    } else {
+-      assert(msem != nullptr);
+-      if (use_blocking_msem) {
+-        // Use a blocking ASQM-version of msemaphore
+-        if (msem->WaitIfUncongested()) {
+-          mem_bound_workers[core_id]->Work(workn);
+-          msem->Post();
+-        } else {
+-          ctx->drop = true;
+-          return;
+-        }
+-      } else {
+-        // Use a non-blocking version of msemaphore
+-        if (msem->TryWait()) {
+-          mem_bound_workers[core_id]->Work(workn);
+-          msem->Post();
+-        } else {
+-          ctx->drop = true;
+-          return;
+-        }
+-      }
+-    }
++    netbench_memory_work(mem_bound_workers, workn);
+   } else if (in->req_type == LOCK_BOUND) {
+ 	  if (cong_aware_mutex_lock_if_uncongested(&mut)) {
+         lock_bound_workers[core_id]->Work(workn);
+@@ -744,6 +720,11 @@ void ServerHandler(void *arg) {
+       msem = rpc::RpcMemSemaphore::GetInstance();
+   }
+ 
++  if (!NetbenchMemoryControlInit(use_msem))
++    panic("memory-work function was not prepared by dynamic-control compiler");
++  printf("Memory control: %s, %s\n", NetbenchMemoryControlMode(),
++         use_msem ? "Wait/Post enabled" : "disabled");
++
+   // Initialize the lock object
+   cong_aware_mutex_init(&mut, CONG_AWARE_MUTEX_POLICY_QLEN);
+ 
