@@ -1,0 +1,12 @@
+completed RPC pair 1/5
+completed RPC pair 2/5
+completed RPC pair 3/5
+completed RPC pair 4/5
+completed RPC pair 5/5
+{
+  "hardcoded_median_rps": 22237.25979517607,
+  "auto_median_rps": 22247.000656031916,
+  "paired_median_percent": -0.0223986915988017,
+  "paired_min_percent": -0.7918749665852376,
+  "paired_max_percent": 0.24311559217145007
+}

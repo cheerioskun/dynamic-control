@@ -1,0 +1,16 @@
+{
+  "source_commit": "fc08d6a",
+  "seconds": 2,
+  "repetitions": 7,
+  "connections": 4,
+  "batch": 16,
+  "work_iterations": 25,
+  "enabled": true,
+  "files_sha256": {
+    "breakwater/apps/netbench/build-parity/hardcoded-verify0/netbench": "536b44569e9bf540087bba8a908f618eec75368761f28d78bdca68ec5b17b4e5",
+    "breakwater/apps/netbench/build-parity/auto-verify0/netbench": "48d94e78aea075234660463b7302727b6001913d5e2b6592674f1f703b446fde",
+    "breakwater/apps/netbench/src/bench_netbench_rpc.py": "a9ca6522945c307a16f331f9a281a5f15b60fb721a96ddab9454c46f66dd6b32",
+    "breakwater/apps/netbench/src/netbench_wire_smoke.py": "4f6feea673478ae3276da4c28a17b833e9b186c19de89a1b3044940f96a540f5",
+    "breakwater/apps/netbench/src/parity-test.config": "18e2e348b025b5b7cf3febb5d6f830cac86deea07bab2bd6f73134d598ec10a7"
+  }
+}

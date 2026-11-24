@@ -12,6 +12,13 @@ test: configure
 setup:
 	python3 scripts/llvm.py setup
 
+.PHONY: setup-shenango check-shenango-patches
+setup-shenango:
+	python3 scripts/shenango.py setup
+
+check-shenango-patches:
+	python3 scripts/shenango.py check
+
 compiler:
 	./scripts/build-llvm.sh
 

@@ -1,0 +1,11 @@
+{
+  "original_repository": "https://github.com/GT-ANSR-Lab/svalinn-shenango.git",
+  "historical_snapshot": "b2ecf1cb29b210a789fe342e941ccdff3c3eacfd",
+  "upstream_revision": "9c2d6b79f857eb74c95d6032f400403d518e7564",
+  "original_prefix": "breakwater/apps/netbench/parity/",
+  "archive_prefix": "experiments/shenango/",
+  "files": 188,
+  "archive_sha256": "b6ddefca7254302faecf469673ff15f3681c54bd14e407bcb1d9eb1a71091302",
+  "archive_digest_method": "SHA256 of sorted relative UTF-8 path + NUL + original bytes + NUL for each file under original_prefix",
+  "note": "Historical run manifests and source hashes are unchanged. Current application patches reconstruct the tested integration and then share the parent registry; layout changes are not new performance measurements."
+}

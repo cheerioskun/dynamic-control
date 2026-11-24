@@ -1,0 +1,19 @@
+CPU 06| <5> cpu: detected 32 cores, 1 nodes
+[  0.000618] CPU 06| <5> loading configuration from '/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/src/parity-test.config'
+[  0.000656] CPU 06| <5> cfg: provisioned 1 cores (1 guaranteed, 0 burstable, 1 spinning)
+[  0.000657] CPU 06| <5> cfg: task is latency critical (LC)
+[  0.000657] CPU 06| <5> cfg: THRESH_QD: 10, THRESH_HT: 0 THRESH_QUANTUM: 100
+[  0.000659] CPU 06| <5> cfg: storage disabled, directpath disabled
+[  0.000665] CPU 06| <5> process pid: 30236
+[  0.008480] CPU 06| <5> shm: using 69206016 bytes
+[  0.008506] CPU 06| <5> net: started network stack
+[  0.008507] CPU 06| <5> net: using the following configuration:
+[  0.008508] CPU 06| <5>   addr:	192.168.11.10
+[  0.008509] CPU 06| <5>   netmask:	255.255.255.0
+[  0.008510] CPU 06| <5>   gateway:	192.168.11.254
+[  0.008510] CPU 06| <5>   mac:		62:87:04:4E:1F:F8
+[  0.008511] CPU 06| <5>   mtu:		1500
+[  0.008958] CPU 06| <5> spawning 1 kthreads
+Using MAB Epsilon Greedy Memory Semaphore Implementation
+BENCH {"mode":"hardcoded","enabled":true,"iterations":1,"calls":149181,"elapsed_ns":281248021,"ns_per_call":1885.280438}
+BENCH {"mode":"hardcoded","enabled":true,"iterations":25,"calls":6742,"elapsed_ns":299420057,"ns_per_call":44411.162415}

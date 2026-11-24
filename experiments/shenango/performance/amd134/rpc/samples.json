@@ -1,0 +1,100 @@
+[
+  {
+    "elapsed_s": 2.0021032849981566,
+    "responses": 44128,
+    "responses_per_second": 22040.82093598914,
+    "repetition": 0,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.00258811599997,
+    "responses": 44928,
+    "responses_per_second": 22434.967850373818,
+    "repetition": 0,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.002723720001086,
+    "responses": 44912,
+    "responses_per_second": 22425.459663490503,
+    "repetition": 1,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.00260350499957,
+    "responses": 44368,
+    "responses_per_second": 22155.159465782282,
+    "repetition": 1,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0023709870001767,
+    "responses": 44880,
+    "responses_per_second": 22413.42902557549,
+    "repetition": 2,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0018414219994156,
+    "responses": 44464,
+    "responses_per_second": 22211.549581979318,
+    "repetition": 2,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0023600669992447,
+    "responses": 44192,
+    "responses_per_second": 22069.956711744926,
+    "repetition": 3,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0018570730026113,
+    "responses": 44384,
+    "responses_per_second": 22171.413033712673,
+    "repetition": 3,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0018236899995827,
+    "responses": 44864,
+    "responses_per_second": 22411.564127313006,
+    "repetition": 4,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0026684639997256,
+    "responses": 44192,
+    "responses_per_second": 22066.558092066734,
+    "repetition": 4,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0027661730018735,
+    "responses": 44208,
+    "responses_per_second": 22073.470480948974,
+    "repetition": 5,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0018217289980385,
+    "responses": 44608,
+    "responses_per_second": 22283.702566425538,
+    "repetition": 5,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0015590759976476,
+    "responses": 44496,
+    "responses_per_second": 22230.670347724623,
+    "repetition": 6,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0024465230017086,
+    "responses": 44128,
+    "responses_per_second": 22037.042933786426,
+    "repetition": 6,
+    "mode": "auto"
+  }
+]

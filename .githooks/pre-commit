@@ -1,3 +1,9 @@
 #!/bin/sh
 set -eu
-exec python3 "$(git rev-parse --show-toplevel)/scripts/llvm.py" hook
+project_root=$(git rev-parse --show-toplevel)
+if git cat-file -e :toolchain.json 2>/dev/null; then
+    python3 "$project_root/scripts/llvm.py" hook
+fi
+if git cat-file -e :shenango.json 2>/dev/null; then
+    python3 "$project_root/scripts/shenango.py" hook
+fi

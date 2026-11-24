@@ -1,0 +1,112 @@
+[
+  {
+    "mode": "hardcoded",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47712,
+    "elapsed_ns": 2000717756,
+    "calls_per_second": 23847.441678,
+    "scheduler_mask": 15,
+    "variant": "hardcoded",
+    "repetition": 0
+  },
+  {
+    "mode": "autoinstrumented",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 48174,
+    "elapsed_ns": 2000684103,
+    "calls_per_second": 24078.763823,
+    "scheduler_mask": 15,
+    "variant": "auto",
+    "repetition": 0
+  },
+  {
+    "mode": "autoinstrumented",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47616,
+    "elapsed_ns": 2000681609,
+    "calls_per_second": 23799.888891,
+    "scheduler_mask": 15,
+    "variant": "auto",
+    "repetition": 1
+  },
+  {
+    "mode": "hardcoded",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47468,
+    "elapsed_ns": 2000690515,
+    "calls_per_second": 23725.808487,
+    "scheduler_mask": 15,
+    "variant": "hardcoded",
+    "repetition": 1
+  },
+  {
+    "mode": "hardcoded",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47533,
+    "elapsed_ns": 2000661290,
+    "calls_per_second": 23758.644323,
+    "scheduler_mask": 15,
+    "variant": "hardcoded",
+    "repetition": 2
+  },
+  {
+    "mode": "autoinstrumented",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 48116,
+    "elapsed_ns": 2000692969,
+    "calls_per_second": 24049.667163,
+    "scheduler_mask": 15,
+    "variant": "auto",
+    "repetition": 2
+  },
+  {
+    "mode": "autoinstrumented",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47849,
+    "elapsed_ns": 2000612419,
+    "calls_per_second": 23917.176333,
+    "scheduler_mask": 15,
+    "variant": "auto",
+    "repetition": 3
+  },
+  {
+    "mode": "hardcoded",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47630,
+    "elapsed_ns": 2000697979,
+    "calls_per_second": 23806.691715,
+    "scheduler_mask": 15,
+    "variant": "hardcoded",
+    "repetition": 3
+  },
+  {
+    "mode": "hardcoded",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 48019,
+    "elapsed_ns": 2000705032,
+    "calls_per_second": 24001.03925,
+    "scheduler_mask": 15,
+    "variant": "hardcoded",
+    "repetition": 4
+  },
+  {
+    "mode": "autoinstrumented",
+    "cores": 4,
+    "jobs": 16,
+    "calls": 47571,
+    "elapsed_ns": 2000684333,
+    "calls_per_second": 23777.364183,
+    "scheduler_mask": 15,
+    "variant": "auto",
+    "repetition": 4
+  }
+]

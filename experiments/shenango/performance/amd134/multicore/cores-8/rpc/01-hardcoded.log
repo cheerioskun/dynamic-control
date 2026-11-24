@@ -1,0 +1,17 @@
+CPU 20| <5> cpu: detected 32 cores, 1 nodes
+[  0.000353] CPU 20| <5> loading configuration from '/users/hemantp/svalinn-shenango-dc/parity-results/multicore-1/cores-8/server.config'
+[  0.000387] CPU 20| <5> cfg: provisioned 8 cores (8 guaranteed, 0 burstable, 8 spinning)
+[  0.000388] CPU 20| <5> cfg: task is latency critical (LC)
+[  0.000389] CPU 20| <5> cfg: THRESH_QD: 10, THRESH_HT: 0 THRESH_QUANTUM: 100
+[  0.000391] CPU 20| <5> cfg: storage disabled, directpath disabled
+[  0.000397] CPU 20| <5> process pid: 31692
+[  0.044837] CPU 20| <5> shm: using 538968064 bytes
+[  0.044870] CPU 20| <5> net: started network stack
+[  0.044871] CPU 20| <5> net: using the following configuration:
+[  0.044872] CPU 20| <5>   addr:	192.168.11.10
+[  0.044873] CPU 20| <5>   netmask:	255.255.255.0
+[  0.044874] CPU 20| <5>   gateway:	192.168.11.254
+[  0.044874] CPU 20| <5>   mac:		62:87:04:4E:1F:F8
+[  0.044875] CPU 20| <5>   mtu:		1500
+[  0.045347] CPU 20| <5> spawning 8 kthreads
+Using MAB Epsilon Greedy Memory Semaphore Implementation

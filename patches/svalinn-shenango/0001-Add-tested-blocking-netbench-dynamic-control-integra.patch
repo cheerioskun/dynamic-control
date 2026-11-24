@@ -1,0 +1,1382 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Hemant Pandey <29029002+cheerioskun@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 17:46:55 -0500
+Subject: [PATCH 1/2] Add tested blocking netbench dynamic-control integration
+
+Import integration source from b2ecf1cb29b210a789fe342e941ccdff3c3eacfd of the historical Shenango working branch. Experimental artifacts belong to the parent dynamic-control repository.
+---
+ breakwater/apps/netbench/src/Makefile         |   6 +-
+ breakwater/apps/netbench/src/Makefile.parity  |  57 +++++++
+ breakwater/apps/netbench/src/PARITY.md        |  91 +++++++++++
+ .../apps/netbench/src/bench_multicore.py      |  98 +++++++++++
+ .../apps/netbench/src/bench_netbench_rpc.py   | 154 ++++++++++++++++++
+ breakwater/apps/netbench/src/bench_parity.py  |  87 ++++++++++
+ .../src/dynamic_control/dynamic_control.cc    |  46 ++++++
+ .../src/dynamic_control/dynamic_control.h     |  53 ++++++
+ .../apps/netbench/src/memory_control.cc       |  97 +++++++++++
+ breakwater/apps/netbench/src/memory_control.h |  25 +++
+ .../apps/netbench/src/memory_control_bench.cc |  58 +++++++
+ .../netbench/src/memory_control_scaling.cc    |  73 +++++++++
+ .../apps/netbench/src/memory_control_test.cc  | 128 +++++++++++++++
+ breakwater/apps/netbench/src/netbench.cc      |  33 +---
+ .../apps/netbench/src/netbench_wire_smoke.py  |  79 +++++++++
+ .../apps/netbench/src/parity-test.config      |   9 +
+ breakwater/apps/netbench/src/run_parity.py    | 101 ++++++++++++
+ 17 files changed, 1166 insertions(+), 29 deletions(-)
+ create mode 100644 breakwater/apps/netbench/src/Makefile.parity
+ create mode 100644 breakwater/apps/netbench/src/PARITY.md
+ create mode 100644 breakwater/apps/netbench/src/bench_multicore.py
+ create mode 100644 breakwater/apps/netbench/src/bench_netbench_rpc.py
+ create mode 100644 breakwater/apps/netbench/src/bench_parity.py
+ create mode 100644 breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
+ create mode 100644 breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
+ create mode 100644 breakwater/apps/netbench/src/memory_control.cc
+ create mode 100644 breakwater/apps/netbench/src/memory_control.h
+ create mode 100644 breakwater/apps/netbench/src/memory_control_bench.cc
+ create mode 100644 breakwater/apps/netbench/src/memory_control_scaling.cc
+ create mode 100644 breakwater/apps/netbench/src/memory_control_test.cc
+ create mode 100644 breakwater/apps/netbench/src/netbench_wire_smoke.py
+ create mode 100644 breakwater/apps/netbench/src/parity-test.config
+ create mode 100644 breakwater/apps/netbench/src/run_parity.py
+
+diff --git a/breakwater/apps/netbench/src/Makefile b/breakwater/apps/netbench/src/Makefile
+index c40e5139b17d0e9e14e2ed89ef11833c63dd8d18..f26e86201a4ff984ef609b6d71b61a63b8be6764 100644
+--- a/breakwater/apps/netbench/src/Makefile
++++ b/breakwater/apps/netbench/src/Makefile
+@@ -1,6 +1,6 @@
+ # Makefile for netbench
+ ROOT_PATH=../../../../
+-BUILD_PATH = ../build
++BUILD_PATH ?= ../build
+ include $(ROOT_PATH)/build/shared.mk
+ 
+ INC += -I./
+@@ -18,7 +18,7 @@ libbwpp = $(ROOT_PATH)/breakwater/bindings/cc/libbw++.a
+ libmsem = $(ROOT_PATH)/m-semaphore/build/libmsem.a
+ libpcm = $(ROOT_PATH)/m-semaphore/deps/pcm/build/src/libpcm.a
+ 
+-lib_src = synthetic_worker.cc util.cc
++lib_src = synthetic_worker.cc util.cc memory_control.cc
+ lib_obj = $(patsubst %.cc,$(BUILD_PATH)/%.o,$(lib_src))
+ 
+ netbench_src = netbench.cc
+@@ -48,7 +48,7 @@ $(netbench_ms_tgt): $(lib_obj) $(netbench_ms_obj) $(librt) $(libbw) $(libbwpp) $
+ # general build rules for all targets
+ src = $(lib_src) $(netbench_src) $(netbench_ms_src)
+ obj = $(BUILD_PATH)/$(src:.cc=.o)
+-dep = $(BUILD_PATH)/$(obj:.o=.d)
++dep = $(obj:.o=.d)
+ 
+ ifneq ($(MAKECMDGOALS),clean)
+ -include $(dep)   # include all dep files in the makefile
+diff --git a/breakwater/apps/netbench/src/Makefile.parity b/breakwater/apps/netbench/src/Makefile.parity
+new file mode 100644
+index 0000000000000000000000000000000000000000..33569caf1c101d57577866200dfef9353ce46914
+--- /dev/null
++++ b/breakwater/apps/netbench/src/Makefile.parity
+@@ -0,0 +1,57 @@
++# Use one patched compiler and identical application flags for both modes.
++# Existing Shenango and semaphore archives remain unchanged.
++MODE ?= hardcoded
++VERIFY ?= 0
++DC_CXX ?= $(HOME)/dynamic-control/build/llvm/bin/clang++
++BUILD_PATH := ../build-parity/$(MODE)-verify$(VERIFY)
++include Makefile
++
++ifeq ($(filter $(MODE),hardcoded auto),)
++$(error MODE must be hardcoded or auto)
++endif
++CXX := $(DC_CXX)
++LDXX := $(DC_CXX)
++# The CloudLab Zen 2 machine has neither AVX-512 nor user interrupts.
++FLAGS := $(filter-out -mavx512f -muintr -flto,$(FLAGS)) -march=znver2
++LDFLAGS := $(filter-out -flto,$(LDFLAGS))
++ifeq ($(VERIFY),1)
++CXXFLAGS += -DNETBENCH_DC_VERIFY
++endif
++ifeq ($(MODE),auto)
++$(BUILD_PATH)/memory_control.o: CXXFLAGS += -DNETBENCH_DC_AUTO -mllvm -dc-enable
++lib_obj += $(BUILD_PATH)/dynamic_control.o
++endif
++
++# Extra prerequisites are added after Makefile's original rules.
++$(netbench_tgt): $(lib_obj)
++$(BUILD_PATH)/dynamic_control.o: dynamic_control/dynamic_control.cc dynamic_control/dynamic_control.h
++	@mkdir -p $(BUILD_PATH)
++	$(CXX) $(CXXFLAGS) -c $< -o $@
++
++.PHONY: parity selftest ir bench
++parity: $(netbench_tgt)
++
++ifeq ($(VERIFY),0)
++bench: $(BUILD_PATH)/memory_control_bench
++scaling: $(BUILD_PATH)/memory_control_scaling
++$(BUILD_PATH)/memory_control_scaling: $(BUILD_PATH)/memory_control_scaling.o $(lib_obj) $(librt) $(libmsem) $(libpcm) $(RUNTIME_DEPS)
++	$(LDXX) -o $@ $(LDFLAGS) $(filter %.o,$^) $(librt) $(libmsem) $(libpcm) $(RUNTIME_LIBS)
++$(BUILD_PATH)/memory_control_bench: $(BUILD_PATH)/memory_control_bench.o $(lib_obj) $(librt) $(libmsem) $(libpcm) $(RUNTIME_DEPS)
++	$(LDXX) -o $@ $(LDFLAGS) $(filter %.o,$^) $(librt) $(libmsem) $(libpcm) $(RUNTIME_LIBS)
++else
++bench:
++	$(error bench requires VERIFY=0)
++endif
++
++ifeq ($(VERIFY),1)
++selftest: $(BUILD_PATH)/memory_control_test
++$(BUILD_PATH)/memory_control_test: $(BUILD_PATH)/memory_control_test.o $(BUILD_PATH)/memory_control.o $(filter %/dynamic_control.o,$(lib_obj)) $(librt) $(libmsem) $(libpcm) $(RUNTIME_DEPS)
++	$(LDXX) -o $@ $(LDFLAGS) $(filter %.o,$^) $(librt) $(libmsem) $(libpcm) $(RUNTIME_LIBS)
++else
++selftest:
++	$(error selftest requires VERIFY=1)
++endif
++
++ir:
++	@mkdir -p $(BUILD_PATH)
++	$(CXX) $(CXXFLAGS) $(if $(filter auto,$(MODE)),-DNETBENCH_DC_AUTO -mllvm -dc-enable) -S -emit-llvm memory_control.cc -o $(BUILD_PATH)/memory_control.ll
+diff --git a/breakwater/apps/netbench/src/PARITY.md b/breakwater/apps/netbench/src/PARITY.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..44efbac809d75773c9c2c72a973a6a114c2bb21d
+--- /dev/null
++++ b/breakwater/apps/netbench/src/PARITY.md
+@@ -0,0 +1,91 @@
++# Blocking netbench: hardcoded versus LLVM instrumentation
++
++Both modes run the existing memory-bandwidth worker and the existing epsilon
++greedy `MemSemaphore` singleton. There are no counter or controller changes.
++The memory branch now waits unconditionally; it does not call `TryWait` or
++`WaitIfUncongested`. Other RPC overload-control policies remain in place.
++
++`memory_control.cc` defines one non-inlined, nonthrowing C-linkage boundary,
++`netbench_memory_work`. In the hardcoded build it explicitly waits, performs
++the work, and posts. In the auto build its source body only performs work;
++the LLVM pass generates the guard and dispatch slot, and the hooks wait/post.
++The worker index is read after acquisition in both builds, because a blocked
++Shenango thread can resume on another scheduler thread.
++
++`server msem` initializes the semaphore and, for auto, enables the descriptor
++before accepting requests. `server no_msem` bypasses acquisition in both modes.
++An auto build fails startup if its compiler did not prepare the function.
++The `PROFILE_ST` calibration path stays outside the instrumented boundary.
++
++The registry in `dynamic_control/` is copied from `dynamic-control` commit
++`c8e6b7b7949664a56085adfe4886eb33981b51f3`. Its header drops the unused mock
++permit-query declaration and describes the real semaphore hooks. The compiler
++ABI is unchanged. No OS-thread TLS is used for permit accounting.
++
++## Build on Linux
++
++From this directory, with Shenango's normal dependencies and libraries built:
++
++```sh
++make -f Makefile.parity MODE=hardcoded parity
++make -f Makefile.parity MODE=auto parity ir
++make -f Makefile.parity MODE=hardcoded VERIFY=1 selftest
++make -f Makefile.parity MODE=auto VERIFY=1 selftest
++```
++
++`DC_CXX` defaults to `$HOME/dynamic-control/build/llvm/bin/clang++`; override it
++with the patched Clang path if needed. Both application builds use that same
++compiler and flags. The parity Makefile targets the test machine's Zen 2 CPU,
++removing AVX-512 and user-interrupt flags. It reuses the existing runtime,
++RPC, semaphore, PCM, and NIC archives. Production binaries have no test counters.
++The ordinary Makefile builds the hardcoded blocking path as well.
++
++## Verify on amd134
++
++With the existing no-PCI iokernel running, `amd_uncore` loaded, and perf access
++available, run:
++
++```sh
++python3 run_parity.py --output /tmp/netbench-parity-results
++```
++
++The output directory must not already exist. The script uses `sudo -n` for
++Shenango applications, which need access to the configured shared memory.
++It does not restart the iokernel or change machine settings. Its single-core
++config bounds semaphore capacity at one. The tests:
++
++- Hold the only permit until all 32 user threads have queued, then execute
++  640 calls. Verify every call runs with one active permit, argument totals
++  match, acquisition/release counts balance, and the queue drains.
++- Run disabled in each build and verify the same work with no acquisitions.
++- Disable auto while a body holds a permit. Verify its release still runs,
++  the next entry bypasses hooks, and re-enabling restores acquisition.
++- Start each production netbench server with `nocontrol` and `msem`. A small
++  Linux-socket client sends 1,024 memory requests over four TCP connections,
++  in batches below the RPC slot limit. Check every response, echoed request
++  fields, and capacity; compare the deterministic response fields across builds.
++
++The network probe speaks this revision's x86-64 nocontrol wire ABI on port 8123.
++It uses the host's dtap route to the no-PCI iokernel. It is a correctness test,
++not a substitute for the original load generator or a performance measurement.
++
++## Recorded result
++
++On `hemantp@amd134.utah.cloudlab.us` (EPYC 7302P, Linux 6.8.0-149-generic),
++using patched Clang 23.1.6, all five runtime cases and both network cases passed.
++Enabled hardcoded and auto each reported 640 calls, sum 10560, 640 acquisitions,
++640 releases, and zero active permits. Disabled cases did the same work with
++zero acquisitions. The toggle case finished three calls with two balanced
++acquisitions. Each server returned all 1,024 network responses with the same
++echoed-field hash. Saved logs and source/archive/binary hashes are in
++`../parity/results/amd134/`.
++
++Remote working copy: `/users/hemantp/svalinn-shenango-dc`. The original
++`/local/shenango` deployment and its running iokernel were left in place.
++This establishes the exercised behavior at a function boundary and through
++netbench RPCs. It does not establish throughput parity or multi-core scaling.
++
++Subsequent worker and RPC measurements, with raw samples and reproduction
++commands, are recorded in `../parity/performance/amd134/RESULTS.md`.
++The multicore extension, including 2/4/8/16 scheduler-thread measurements with
++no permit TLS, is recorded in `../parity/performance/amd134/MULTICORE.md`.
+diff --git a/breakwater/apps/netbench/src/bench_multicore.py b/breakwater/apps/netbench/src/bench_multicore.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..9d752a67fc575b96f21d25d5c53e2a890184a6b2
+--- /dev/null
++++ b/breakwater/apps/netbench/src/bench_multicore.py
+@@ -0,0 +1,98 @@
++#!/usr/bin/env python3
++"""Multicore correctness, concurrent worker throughput, then real netbench RPCs.
++
++No permit TLS. The original adaptive semaphore and counters are unchanged.
++"""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import statistics
++import subprocess
++import sys
++
++SRC = Path(__file__).resolve().parent
++BUILD = SRC.parent / "build-parity"
++
++
++def run(command, log, timeout=30):
++    with log.open("w") as output:
++        subprocess.run(command, stdout=output, stderr=subprocess.STDOUT,
++                       timeout=timeout, check=True)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--source-commit", required=True)
++    parser.add_argument("--cores", type=int, nargs="+", default=[2, 4, 8])
++    parser.add_argument("--repetitions", type=int, default=5)
++    args = parser.parse_args()
++    out = args.output.resolve()
++    out.mkdir(parents=True, exist_ok=False)
++    files = [SRC / name for name in ["bench_multicore.py", "bench_netbench_rpc.py",
++        "memory_control_scaling.cc", "memory_control.cc", "memory_control.h",
++        "memory_control_test.cc", "Makefile.parity"]]
++    files += [BUILD / f"{mode}-verify{verify}" / target for mode in ["hardcoded", "auto"]
++              for verify, target in [(0, "netbench"), (0, "memory_control_scaling"),
++                                     (1, "memory_control_test")]]
++    manifest = {"source_commit": args.source_commit, "cores": args.cores,
++                "permit_tls": False, "repetitions": args.repetitions,
++                "lscpu": subprocess.check_output(["lscpu"], text=True),
++                "files_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
++                                 for p in files}}
++    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    summary = []
++    for cores in args.cores:
++        folder = out / f"cores-{cores}"
++        folder.mkdir()
++        config = folder / "server.config"
++        text = (SRC / "parity-test.config").read_text()
++        for key in ["runtime_kthreads", "runtime_spinning_kthreads", "runtime_guaranteed_kthreads"]:
++            text = text.replace(f"{key} 1", f"{key} {cores}")
++        config.write_text(text)
++        for mode in ["hardcoded", "auto"]:
++            log = folder / f"correctness-{mode}.log"
++            run(["sudo", "-n", "timeout", "25s",
++                 str(BUILD / f"{mode}-verify1" / "memory_control_test"),
++                 str(config), "multicore"], log)
++            if "PASS " not in log.read_text():
++                raise RuntimeError(f"missing correctness result: {log}")
++        print(f"{cores} cores: correctness passed", flush=True)
++        samples = []
++        for repetition in range(args.repetitions):
++            modes = ["hardcoded", "auto"] if repetition % 2 == 0 else ["auto", "hardcoded"]
++            for mode in modes:
++                log = folder / f"worker-{repetition:02d}-{mode}.log"
++                run(["sudo", "-n", "timeout", "20s",
++                     str(BUILD / f"{mode}-verify0" / "memory_control_scaling"),
++                     str(config)], log)
++                rows = [json.loads(line[8:]) for line in log.read_text().splitlines()
++                        if line.startswith("SCALING ")]
++                if len(rows) != 1 or rows[0]["scheduler_mask"].bit_count() != cores:
++                    raise RuntimeError(f"not all scheduler threads observed: {log}")
++                rows[0].update(variant=mode, repetition=repetition)
++                samples.extend(rows)
++            (folder / "worker-samples.json").write_text(json.dumps(samples, indent=2) + "\n")
++            print(f"{cores} cores: worker pair {repetition+1}/{args.repetitions}", flush=True)
++        hard = {s["repetition"]: s["calls_per_second"] for s in samples if s["variant"] == "hardcoded"}
++        auto = {s["repetition"]: s["calls_per_second"] for s in samples if s["variant"] == "auto"}
++        differences = [100 * (auto[i] / hard[i] - 1) for i in hard]
++        row = {"cores": cores, "hardcoded_worker_median_rps": statistics.median(hard.values()),
++               "auto_worker_median_rps": statistics.median(auto.values()),
++               "worker_paired_median_percent": statistics.median(differences),
++               "worker_paired_min_percent": min(differences),
++               "worker_paired_max_percent": max(differences)}
++        run([sys.executable, str(SRC / "bench_netbench_rpc.py"),
++             "--config", str(config), "--cores", str(cores),
++             "--source-commit", args.source_commit,
++             "--repetitions", str(args.repetitions), "--output", str(folder / "rpc")],
++            folder / "rpc-run.log", timeout=args.repetitions * 20 + 30)
++        row["rpc"] = json.loads((folder / "rpc/summary.json").read_text())
++        summary.append(row)
++        (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
++        print(json.dumps(row), flush=True)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/breakwater/apps/netbench/src/bench_netbench_rpc.py b/breakwater/apps/netbench/src/bench_netbench_rpc.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1063cc47d6ddba94ad80b2f3ecae27193ecee24e
+--- /dev/null
++++ b/breakwater/apps/netbench/src/bench_netbench_rpc.py
+@@ -0,0 +1,154 @@
++#!/usr/bin/env python3
++"""Closed-loop throughput through the real netbench server on the no-PCI path.
++
++Four Linux-socket clients each keep batches of 16 requests outstanding. This
++includes Python, kernel TCP, dtap, and the iokernel; it is not a NIC benchmark.
++"""
++import argparse
++import multiprocessing
++import hashlib
++import json
++from pathlib import Path
++import statistics
++import socket
++import struct
++import subprocess
++import time
++
++from netbench_wire_smoke import HEADER, PAYLOAD_SIZE, read_full
++
++SRC = Path(__file__).resolve().parent
++BUILD = SRC.parent / "build-parity"
++
++
++def measure(seconds):
++    context = multiprocessing.get_context("fork")
++    barrier = context.Barrier(4)
++    results = context.Queue()
++
++    def client(index):
++        frames = bytearray()
++        expected = {}
++        for offset in range(16):
++            ident = index * 16 + offset
++            payload = bytearray(PAYLOAD_SIZE)
++            struct.pack_into("<Q", payload, 0, 1)
++            struct.pack_into(">QQ", payload, 8, 25, ident)
++            expected[ident] = bytes(payload[:24])
++            frames.extend(HEADER.pack(0x63727063, 0, PAYLOAD_SIZE, ident, 0))
++            frames.extend(payload)
++
++        def batch(sock):
++            sock.sendall(frames)
++            seen = set()
++            for _ in range(16):
++                magic, op, size, ident, _ = HEADER.unpack(read_full(sock, HEADER.size))
++                if magic != 0x73727063 or op != 0 or size != PAYLOAD_SIZE or ident in seen:
++                    raise RuntimeError("invalid, duplicate, or dropped response")
++                response = read_full(sock, size)
++                if response[:24] != expected[ident]:
++                    raise RuntimeError("response fields changed")
++                seen.add(ident)
++
++        with socket.create_connection(("192.168.11.10", 8123), timeout=5) as sock:
++            sock.settimeout(5)
++            sock.sendall(struct.pack("<i", 0))
++            for _ in range(10):
++                batch(sock)
++            barrier.wait(timeout=10)
++            cpu_start = time.process_time()
++            start = time.perf_counter()
++            deadline = start + seconds
++            count = 0
++            while time.perf_counter() < deadline:
++                batch(sock)
++                count += 16
++            return {"start": start, "end": time.perf_counter(), "responses": count,
++                    "client_cpu_s": time.process_time() - cpu_start}
++
++    def process(index):
++        try:
++            results.put(client(index))
++        except Exception as error:
++            results.put({"error": repr(error)})
++
++    processes = [context.Process(target=process, args=(index,)) for index in range(4)]
++    for child in processes:
++        child.start()
++    try:
++        rows = [results.get(timeout=seconds + 20) for _ in processes]
++        if any("error" in row for row in rows):
++            raise RuntimeError(rows)
++        for child in processes:
++            child.join(timeout=5)
++            if child.exitcode != 0:
++                raise RuntimeError("client process did not finish successfully")
++    finally:
++        for child in processes:
++            if child.is_alive():
++                child.terminate()
++            child.join(timeout=5)
++    elapsed = max(row["end"] for row in rows) - min(row["start"] for row in rows)
++    responses = sum(row["responses"] for row in rows)
++    return {"elapsed_s": elapsed, "responses": responses,
++            "responses_per_second": responses / elapsed,
++            "client_cpu_s": sum(row["client_cpu_s"] for row in rows)}
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--source-commit", required=True)
++    parser.add_argument("--config", type=Path, default=SRC / "parity-test.config")
++    parser.add_argument("--cores", type=int, default=1)
++    parser.add_argument("--seconds", type=float, default=2)
++    parser.add_argument("--repetitions", type=int, default=7)
++    args = parser.parse_args()
++    out = args.output.resolve()
++    out.mkdir(parents=True, exist_ok=False)
++    files = [BUILD / f"{mode}-verify0" / "netbench" for mode in ["hardcoded", "auto"]]
++    files += [SRC / "bench_netbench_rpc.py", SRC / "netbench_wire_smoke.py",
++              args.config.resolve()]
++    manifest = {"source_commit": args.source_commit, "seconds": args.seconds,
++                "cores": args.cores, "client_processes": 4,
++                "repetitions": args.repetitions, "connections": 4, "batch": 16,
++                "work_iterations": 25, "enabled": True,
++                "files_sha256": {str(p):
++                    hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
++    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    samples = []
++    for repetition in range(args.repetitions):
++        modes = ["hardcoded", "auto"] if repetition % 2 == 0 else ["auto", "hardcoded"]
++        for mode in modes:
++            binary = BUILD / f"{mode}-verify0" / "netbench"
++            with (out / f"{repetition:02d}-{mode}.log").open("w") as log:
++                server = subprocess.Popen(["sudo", "-n", "timeout", "20s", str(binary),
++                    "nocontrol", str(args.config.resolve()), "server", "msem"],
++                    stdout=log, stderr=subprocess.STDOUT, cwd=out)
++                try:
++                    time.sleep(0.5)
++                    if server.poll() is not None:
++                        raise RuntimeError("server exited")
++                    result = measure(args.seconds)
++                finally:
++                    server.terminate()
++                    server.wait(timeout=5)
++            result.update(repetition=repetition, mode=mode)
++            samples.append(result)
++        (out / "samples.json").write_text(json.dumps(samples, indent=2) + "\n")
++        print(f"completed RPC pair {repetition + 1}/{args.repetitions}", flush=True)
++    hardcoded = {row["repetition"]: row["responses_per_second"] for row in samples
++                 if row["mode"] == "hardcoded"}
++    auto = {row["repetition"]: row["responses_per_second"] for row in samples
++            if row["mode"] == "auto"}
++    deltas = [100 * (auto[i] / hardcoded[i] - 1) for i in hardcoded]
++    summary = {"hardcoded_median_rps": statistics.median(hardcoded.values()),
++               "auto_median_rps": statistics.median(auto.values()),
++               "paired_median_percent": statistics.median(deltas),
++               "paired_min_percent": min(deltas), "paired_max_percent": max(deltas)}
++    (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
++    print(json.dumps(summary, indent=2), flush=True)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/breakwater/apps/netbench/src/bench_parity.py b/breakwater/apps/netbench/src/bench_parity.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f5725d9890e1e6506a97bb9973ece5ed84f799c8
+--- /dev/null
++++ b/breakwater/apps/netbench/src/bench_parity.py
+@@ -0,0 +1,87 @@
++#!/usr/bin/env python3
++"""Repeated, alternating single-core measurements with real netbench work."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import statistics
++import subprocess
++
++SRC = Path(__file__).resolve().parent
++ROOT = SRC.parents[3]
++BUILD = SRC.parent / "build-parity"
++
++
++def sha256(path):
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--source-commit", required=True)
++    parser.add_argument("--repetitions", type=int, default=9)
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True, exist_ok=False)
++    files = [SRC / name for name in ["memory_control_bench.cc", "memory_control.cc",
++             "memory_control.h", "synthetic_worker.cc", "synthetic_worker.h",
++             "Makefile.parity", "parity-test.config", "bench_parity.py",
++             "dynamic_control/dynamic_control.cc", "dynamic_control/dynamic_control.h"]]
++    files += [ROOT / name for name in ["libruntime.a", "libnet.a", "libbase.a",
++              "bindings/cc/librt++.a", "m-semaphore/build/libmsem.a",
++              "m-semaphore/deps/pcm/build/src/libpcm.a", "build/config", "build/shared.mk"]]
++    files += [BUILD / f"{mode}-verify0" / "memory_control_bench"
++              for mode in ["hardcoded", "auto"]]
++    manifest = {"source_commit": args.source_commit,
++                "repetitions": args.repetitions,
++                "files_sha256": {str(p.relative_to(ROOT)): sha256(p) for p in files}}
++    for command in [["uname", "-a"], ["lscpu"],
++                    [str(Path.home() / "dynamic-control/build/llvm/bin/clang++"), "--version"]]:
++        manifest[command[0]] = subprocess.check_output(command, text=True)
++    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    samples = []
++    # Reverse each pair every repetition; rotate enabled/disabled order too.
++    for repetition in range(args.repetitions):
++        states = ["enabled", "disabled"] if repetition % 2 == 0 else ["disabled", "enabled"]
++        for state in states:
++            modes = ["hardcoded", "auto"] if repetition % 2 == 0 else ["auto", "hardcoded"]
++            for mode in modes:
++                binary = BUILD / f"{mode}-verify0" / "memory_control_bench"
++                log = output / f"{repetition:02d}-{mode}-{state}.log"
++                with log.open("w") as stream:
++                    subprocess.run(["sudo", "-n", "timeout", "20s", str(binary),
++                                    str(SRC / "parity-test.config"), state],
++                                   stdout=stream, stderr=subprocess.STDOUT,
++                                   timeout=25, check=True)
++                rows = [json.loads(line[6:]) for line in log.read_text().splitlines()
++                        if line.startswith("BENCH ")]
++                if len(rows) != 2:
++                    raise RuntimeError(f"missing benchmark output: {log}")
++                for row in rows:
++                    row.update(repetition=repetition, variant=mode)
++                samples.extend(rows)
++        (output / "samples.json").write_text(json.dumps(samples, indent=2) + "\n")
++        print(f"completed repetition {repetition + 1}/{args.repetitions}", flush=True)
++    summary = []
++    for enabled in [True, False]:
++        for iterations in [1, 25]:
++            selected = [s for s in samples if s["enabled"] == enabled and
++                        s["iterations"] == iterations]
++            hardcoded = {s["repetition"]: s["ns_per_call"] for s in selected
++                         if s["variant"] == "hardcoded"}
++            auto = {s["repetition"]: s["ns_per_call"] for s in selected
++                    if s["variant"] == "auto"}
++            ratios = [100 * (auto[i] / hardcoded[i] - 1) for i in hardcoded]
++            row = {"enabled": enabled, "iterations": iterations,
++                   "hardcoded_median_ns": statistics.median(hardcoded.values()),
++                   "auto_median_ns": statistics.median(auto.values()),
++                   "paired_median_percent": statistics.median(ratios),
++                   "paired_min_percent": min(ratios), "paired_max_percent": max(ratios)}
++            summary.append(row)
++    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
++    print(json.dumps(summary, indent=2), flush=True)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..8412624facb3b3cf6dfb5de51826872e5b08a41d
+--- /dev/null
++++ b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
+@@ -0,0 +1,46 @@
++#include "dynamic_control.h"
++
++#include <cstring>
++#include <type_traits>
++
++static_assert(std::is_standard_layout_v<DcFunction>);
++static_assert(sizeof(DcEntry) == sizeof(void *));
++static_assert(sizeof(DcFunction) == 4 * sizeof(void *));
++static_assert(offsetof(DcFunction, body) == sizeof(void *));
++static_assert(offsetof(DcFunction, guard) == 2 * sizeof(void *));
++static_assert(offsetof(DcFunction, target) == 3 * sizeof(void *));
++static_assert(sizeof(DcModule) == 3 * sizeof(void *));
++static_assert(offsetof(DcModule, count) == sizeof(void *));
++static_assert(offsetof(DcModule, next) == 2 * sizeof(void *));
++static_assert(__atomic_always_lock_free(sizeof(DcEntry), nullptr));
++
++namespace {
++// Module constructors register their tables before main.
++DcModule *modules = nullptr;
++}
++
++extern "C" void __dc_register_module(DcModule *module) noexcept {
++  module->next = modules;
++  modules = module;
++}
++
++extern "C" const DcFunction *dc_find(const char *name) noexcept {
++  for (auto *module = modules; module; module = module->next) {
++    for (size_t i = 0; i < module->count; ++i) {
++      const auto *function = &module->functions[i];
++      if (std::strcmp(name, function->name) == 0)
++        return function;
++    }
++  }
++  return nullptr;
++}
++
++extern "C" void dc_enable(const DcFunction *function) noexcept {
++  // Match compiler-emitted LLVM atomic pointer loads without pretending the
++  // compiler's raw pointer global is a constructed std::atomic object.
++  __atomic_store_n(function->target, function->guard, __ATOMIC_RELEASE);
++}
++
++extern "C" void dc_disable(const DcFunction *function) noexcept {
++  __atomic_store_n(function->target, function->body, __ATOMIC_RELEASE);
++}
+diff --git a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..64b43427551c0a493ce6cca4176328dd7790c23c
+--- /dev/null
++++ b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
+@@ -0,0 +1,53 @@
++#ifndef DYNAMIC_CONTROL_H
++#define DYNAMIC_CONTROL_H
++
++#include <stddef.h>
++#include <stdbool.h>
++
++#ifdef __cplusplus
++#define DC_NOEXCEPT noexcept
++extern "C" {
++#else
++#define DC_NOEXCEPT
++#endif
++
++// Erased addresses are stored, never called through this type. Dispatchers
++// restore the original signature. Slot accesses must always be atomic.
++typedef void (*DcEntry)(void);
++
++// Compiler ABI: four pointer-sized fields, in this order. Descriptors are
++// immutable; each target points to a separate, pointer-aligned writable slot.
++typedef struct DcFunction {
++  const char *name;
++  DcEntry body;
++  DcEntry guard;
++  DcEntry *target;
++} DcFunction;
++
++// One registration node per module, linked by its constructor before main.
++// Nodes and descriptors live until exit.
++typedef struct DcModule {
++  const DcFunction *functions;
++  size_t count;
++  struct DcModule *next;
++} DcModule;
++
++void __dc_register_module(DcModule *module) DC_NOEXCEPT;
++
++// Exact, unique LLVM/linkage names. Missing names return NULL.
++// Call after startup registration. Handles remain valid until exit.
++const DcFunction *dc_find(const char *name) DC_NOEXCEPT;
++// Require a non-null handle returned by dc_find. Future entries select the
++// published destination; calls racing with a toggle can take either path.
++void dc_enable(const DcFunction *function) DC_NOEXCEPT;
++void dc_disable(const DcFunction *function) DC_NOEXCEPT;
++
++// Netbench's backend uses the existing blocking MemSemaphore singleton.
++void dc_acquire(const DcFunction *function) DC_NOEXCEPT;
++void dc_release(const DcFunction *function) DC_NOEXCEPT;
++
++#ifdef __cplusplus
++}
++#endif
++#undef DC_NOEXCEPT
++#endif
+diff --git a/breakwater/apps/netbench/src/memory_control.cc b/breakwater/apps/netbench/src/memory_control.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..63380a784618d684740c0c420ab91ca20f104fb0
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control.cc
+@@ -0,0 +1,97 @@
++#include "memory_control.h"
++#include "synthetic_worker.h"
++#include "m_semaphore.hpp"
++
++extern "C" {
++#include <runtime/thread.h>
++}
++
++#ifdef NETBENCH_DC_AUTO
++#include "dynamic_control/dynamic_control.h"
++#endif
++#ifdef NETBENCH_DC_VERIFY
++#include <atomic>
++#endif
++
++namespace {
++MemSemaphore *semaphore;
++#ifdef NETBENCH_DC_AUTO
++const DcFunction *descriptor;
++#endif
++#ifdef NETBENCH_DC_VERIFY
++std::atomic<uint64_t> acquired{0}, released{0}, active{0};
++#endif
++
++void Acquire() noexcept {
++  semaphore->Wait();
++#ifdef NETBENCH_DC_VERIFY
++  acquired.fetch_add(1, std::memory_order_relaxed);
++  active.fetch_add(1, std::memory_order_relaxed);
++#endif
++}
++
++void Release() noexcept {
++#ifdef NETBENCH_DC_VERIFY
++  active.fetch_sub(1, std::memory_order_relaxed);
++  released.fetch_add(1, std::memory_order_relaxed);
++#endif
++  semaphore->Post();
++}
++}  // namespace
++
++#ifdef NETBENCH_DC_AUTO
++extern "C" void dc_acquire(const DcFunction *) noexcept { Acquire(); }
++extern "C" void dc_release(const DcFunction *) noexcept { Release(); }
++#define MEMORY_BOUNDARY __attribute__((annotate("dc"), noinline))
++#else
++#define MEMORY_BOUNDARY __attribute__((noinline))
++#endif
++
++extern "C" MEMORY_BOUNDARY void
++netbench_memory_work(SyntheticWorker **workers, uint64_t iterations) noexcept {
++#ifndef NETBENCH_DC_AUTO
++  if (semaphore) Acquire();
++#endif
++  workers[get_current_affinity()]->Work(iterations);
++#ifndef NETBENCH_DC_AUTO
++  if (semaphore) Release();
++#endif
++}
++
++bool NetbenchMemoryControlInit(bool enabled) noexcept {
++  semaphore = enabled ? MemSemaphore::GetInstance() : nullptr;
++#ifdef NETBENCH_DC_AUTO
++  descriptor = dc_find("netbench_memory_work");
++  if (!descriptor) return false;  // Never silently run an unprepared build.
++  if (enabled) dc_enable(descriptor);
++  else dc_disable(descriptor);
++#endif
++  return true;
++}
++
++const char *NetbenchMemoryControlMode() noexcept {
++#ifdef NETBENCH_DC_AUTO
++  return "autoinstrumented";
++#else
++  return "hardcoded";
++#endif
++}
++
++#ifdef NETBENCH_DC_VERIFY
++MemoryControlCounts NetbenchMemoryControlCounts() noexcept {
++  return {acquired.load(std::memory_order_relaxed),
++          released.load(std::memory_order_relaxed),
++          active.load(std::memory_order_relaxed)};
++}
++
++bool NetbenchMemoryControlSetEnabled(bool enabled) noexcept {
++#ifdef NETBENCH_DC_AUTO
++  if (!descriptor || !semaphore) return false;
++  if (enabled) dc_enable(descriptor);
++  else dc_disable(descriptor);
++  return true;
++#else
++  return false;
++#endif
++}
++#endif
+diff --git a/breakwater/apps/netbench/src/memory_control.h b/breakwater/apps/netbench/src/memory_control.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..a7a377a19de3e7bfe17632e60225ee5fd312465a
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control.h
+@@ -0,0 +1,25 @@
++#pragma once
++
++#include <cstdint>
++
++class SyntheticWorker;
++
++// Called inside Shenango, before request threads start. Both builds use the
++// existing MemSemaphore singleton; the auto build also publishes its guard.
++bool NetbenchMemoryControlInit(bool enabled) noexcept;
++const char *NetbenchMemoryControlMode() noexcept;
++
++// workers is indexed after acquisition, because Wait may migrate the thread.
++extern "C" void netbench_memory_work(SyntheticWorker **workers,
++                                      uint64_t iterations) noexcept;
++
++#ifdef NETBENCH_DC_VERIFY
++struct MemoryControlCounts {
++  uint64_t acquired;
++  uint64_t released;
++  uint64_t active;
++};
++MemoryControlCounts NetbenchMemoryControlCounts() noexcept;
++// Test only: switch future entries while an invocation holds a permit.
++bool NetbenchMemoryControlSetEnabled(bool enabled) noexcept;
++#endif
+diff --git a/breakwater/apps/netbench/src/memory_control_bench.cc b/breakwater/apps/netbench/src/memory_control_bench.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e80ff93b1e738ac518dc665b66d9f754741d50f2
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control_bench.cc
+@@ -0,0 +1,58 @@
++// Time the actual netbench work boundary inside Shenango, without RPC/client
++// overhead or verification counters. Setup and calibration are outside timing.
++#include "memory_control.h"
++#include "synthetic_worker.h"
++#include "cc/runtime.h"
++#include "cc/sync.h"
++
++#include <algorithm>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <time.h>
++
++barrier_t barrier; // Referenced by an unused synthetic worker implementation.
++
++namespace {
++bool enabled;
++
++uint64_t Now() {
++  timespec t;
++  clock_gettime(CLOCK_MONOTONIC_RAW, &t);
++  return uint64_t(t.tv_sec) * 1000000000 + t.tv_nsec;
++}
++
++uint64_t Batch(SyntheticWorker **workers, uint64_t iterations, uint64_t calls) {
++  uint64_t start = Now();
++  for (uint64_t i = 0; i < calls; ++i)
++    netbench_memory_work(workers, iterations);
++  return Now() - start;
++}
++
++void Run(void *) {
++  if (rt::RuntimeMaxCores() != 1 || !NetbenchMemoryControlInit(enabled))
++    std::exit(2);
++  SyntheticWorker *workers[NCPU]{};
++  workers[0] = SyntheticWorkerFactory("membwantagonist:32768:0:0");
++  if (!workers[0]) std::exit(2);
++  for (uint64_t iterations : {uint64_t(1), uint64_t(25)}) {
++    Batch(workers, iterations, 2000);
++    uint64_t calibration = Batch(workers, iterations, 2000);
++    uint64_t calls = std::clamp(uint64_t(300000000.0 * 2000 / calibration),
++                                uint64_t(5000), uint64_t(500000));
++    uint64_t elapsed = Batch(workers, iterations, calls);
++    printf("BENCH {\"mode\":\"%s\",\"enabled\":%s,\"iterations\":%lu,"
++           "\"calls\":%lu,\"elapsed_ns\":%lu,\"ns_per_call\":%.6f}\n",
++           NetbenchMemoryControlMode(), enabled ? "true" : "false",
++           iterations, calls, elapsed, double(elapsed) / calls);
++  }
++  std::exit(0);
++}
++} // namespace
++
++int main(int argc, char **argv) {
++  if (argc != 3 || (std::strcmp(argv[2], "enabled") &&
++                    std::strcmp(argv[2], "disabled"))) return 2;
++  enabled = !std::strcmp(argv[2], "enabled");
++  return runtime_init(argv[1], Run, nullptr);
++}
+diff --git a/breakwater/apps/netbench/src/memory_control_scaling.cc b/breakwater/apps/netbench/src/memory_control_scaling.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e15a7e997ae6c49facef3dadb1fe1fd482520526
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control_scaling.cc
+@@ -0,0 +1,73 @@
++// Concurrent real netbench workers under Shenango, without permit TLS.
++#include "memory_control.h"
++#include "synthetic_worker.h"
++#include "cc/runtime.h"
++#include "cc/sync.h"
++#include "cc/thread.h"
++
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++#include <time.h>
++
++barrier_t barrier;
++
++namespace {
++uint64_t Now() {
++  timespec t;
++  clock_gettime(CLOCK_MONOTONIC_RAW, &t);
++  return uint64_t(t.tv_sec) * 1000000000 + t.tv_nsec;
++}
++
++void Phase(SyntheticWorker **workers, int jobs, uint64_t duration, bool report) {
++  rt::WaitGroup ready(jobs), done(jobs);
++  rt::Semaphore start(0);
++  std::atomic<uint64_t> total{0}, scheduler_mask{0};
++  uint64_t deadline = 0;
++  for (int i = 0; i < jobs; ++i) {
++    rt::Spawn([&] {
++      ready.Done();
++      start.Wait();
++      uint64_t count = 0, mask = 0;
++      do {
++        netbench_memory_work(workers, 25);
++        mask |= uint64_t(1) << get_current_affinity();
++        ++count;
++      } while (Now() < deadline);
++      total.fetch_add(count, std::memory_order_relaxed);
++      scheduler_mask.fetch_or(mask, std::memory_order_relaxed);
++      done.Done();
++    });
++  }
++  ready.Wait();
++  uint64_t begin = Now();
++  deadline = begin + duration;
++  for (int i = 0; i < jobs; ++i) start.Post();
++  done.Wait();
++  uint64_t elapsed = Now() - begin;
++  if (report)
++    printf("SCALING {\"mode\":\"%s\",\"cores\":%d,\"jobs\":%d,"
++           "\"calls\":%lu,\"elapsed_ns\":%lu,\"calls_per_second\":%.6f,"
++           "\"scheduler_mask\":%lu}\n", NetbenchMemoryControlMode(),
++           rt::RuntimeMaxCores(), jobs, total.load(), elapsed,
++           double(total.load()) * 1e9 / elapsed, scheduler_mask.load());
++}
++
++void Run(void *) {
++  int cores = rt::RuntimeMaxCores();
++  if (cores < 1 || cores > 32 || !NetbenchMemoryControlInit(true)) std::exit(2);
++  SyntheticWorker *workers[NCPU]{};
++  for (int i = 0; i < cores; ++i) {
++    workers[i] = SyntheticWorkerFactory("membwantagonist:32768:0:0");
++    if (!workers[i]) std::exit(2);
++  }
++  Phase(workers, cores * 4, 1000000000, false);
++  Phase(workers, cores * 4, 2000000000, true);
++  std::exit(0);
++}
++} // namespace
++
++int main(int argc, char **argv) {
++  if (argc != 2) return 2;
++  return runtime_init(argv[1], Run, nullptr);
++}
+diff --git a/breakwater/apps/netbench/src/memory_control_test.cc b/breakwater/apps/netbench/src/memory_control_test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..aca0ce02ed30a1d2078ceab34e7c5f1b6f17f569
+--- /dev/null
++++ b/breakwater/apps/netbench/src/memory_control_test.cc
+@@ -0,0 +1,128 @@
++#include "memory_control.h"
++#include "synthetic_worker.h"
++#include "m_semaphore.hpp"
++#include "cc/runtime.h"
++#include "cc/thread.h"
++#include "cc/sync.h"
++
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++
++namespace {
++constexpr int kThreads = 32;
++constexpr int kCalls = 20;
++bool enabled;
++bool multicore;
++bool toggle;
++bool expect_permit;
++std::atomic<uint64_t> calls{0}, sum{0};
++rt::Semaphore *entered, *resume;
++
++void Check(bool ok, const char *message) {
++  if (!ok) {
++    fprintf(stderr, "FAIL: %s\n", message);
++    std::exit(1);
++  }
++}
++
++class Worker : public SyntheticWorker {
++ public:
++  void Work(uint64_t n) override {
++    Check((expect_permit ? (NetbenchMemoryControlCounts().active >= 1 &&
++           NetbenchMemoryControlCounts().active <= uint64_t(rt::RuntimeMaxCores()))
++          : NetbenchMemoryControlCounts().active == 0),
++          "work sees the expected permit state");
++    if (toggle) {
++      entered->Post();
++      resume->Wait();
++    } else {
++      // Yield while holding a permit so other user threads try to acquire.
++      rt::Yield();
++    }
++    sum.fetch_add(n, std::memory_order_relaxed);
++    calls.fetch_add(1, std::memory_order_relaxed);
++  }
++};
++
++void Run(void *) {
++  // A single scheduler thread makes capacity exactly one and ensures that
++  // blocked acquisition really parks a user thread rather than the OS thread.
++  Check(multicore || rt::RuntimeMaxCores() == 1,
++        "single-core cases need runtime_kthreads 1");
++  Check(NetbenchMemoryControlInit(enabled), "compiler descriptor registered");
++  Worker worker;
++  SyntheticWorker *workers[NCPU];
++  for (auto &w : workers) w = &worker;
++
++  if (toggle) {
++    rt::Semaphore entry(0), finish(0);
++    entered = &entry;
++    resume = &finish;
++    rt::Thread invocation([&] { netbench_memory_work(workers, 7); });
++    entry.Wait();
++    Check(NetbenchMemoryControlCounts().active == 1, "guard holds permit");
++    Check(NetbenchMemoryControlSetEnabled(false), "disable while body active");
++    finish.Post();
++    invocation.Join();
++    toggle = false;
++    expect_permit = false;
++    netbench_memory_work(workers, 11); // disabled entry must not acquire
++    auto c = NetbenchMemoryControlCounts();
++    Check(c.acquired == 1 && c.released == 1 && c.active == 0,
++          "active guard releases after disable; later entry bypasses hooks");
++    Check(calls == 2 && sum == 18, "toggle preserves arguments and work");
++    Check(NetbenchMemoryControlSetEnabled(true), "reenable");
++    expect_permit = true;
++    netbench_memory_work(workers, 13);
++    c = NetbenchMemoryControlCounts();
++    Check(c.acquired == 2 && c.released == 2 && c.active == 0,
++          "reenabled entry acquires and releases");
++    Check(calls == 3 && sum == 31, "reenable executes the body");
++  } else {
++    auto *sem = enabled ? MemSemaphore::GetInstance() : nullptr;
++    // Hold the only permit until every spawned thread has queued.
++    if (sem && !multicore) sem->Wait();
++    rt::WaitGroup done(kThreads);
++    for (int i = 0; i < kThreads; ++i) {
++      rt::Spawn([&, i] {
++        for (int j = 0; j < kCalls; ++j)
++          netbench_memory_work(workers, i + 1);
++        done.Done();
++      });
++    }
++    if (sem && !multicore) {
++      while (sem->QueueLength() != kThreads) rt::Yield();
++      Check(calls == 0, "no work before a permit is available");
++      sem->Post();
++    }
++    done.Wait();
++    auto c = NetbenchMemoryControlCounts();
++    const uint64_t expected = kThreads * kCalls;
++    Check(calls == expected, "every invocation executed");
++    Check(sum == kCalls * kThreads * (kThreads + 1) / 2, "arguments preserved");
++    Check(c.acquired == (enabled ? expected : 0) &&
++          c.released == c.acquired && c.active == 0, "balanced hooks");
++    if (sem) Check(sem->QueueLength() == 0, "waiter queue drained");
++  }
++  auto c = NetbenchMemoryControlCounts();
++  printf("PASS mode=%s enabled=%d calls=%lu sum=%lu acquired=%lu released=%lu active=%lu\n",
++         NetbenchMemoryControlMode(), enabled, calls.load(), sum.load(),
++         c.acquired, c.released, c.active);
++  std::exit(0);
++}
++} // namespace
++
++int main(int argc, char **argv) {
++  if (argc != 3) {
++    fprintf(stderr, "usage: %s CONFIG enabled|disabled|toggle|multicore\n", argv[0]);
++    return 2;
++  }
++  multicore = std::strcmp(argv[2], "multicore") == 0;
++  toggle = std::strcmp(argv[2], "toggle") == 0;
++  enabled = multicore || toggle || std::strcmp(argv[2], "enabled") == 0;
++  expect_permit = enabled;
++  if (!enabled && std::strcmp(argv[2], "disabled") != 0) return 2;
++  return runtime_init(argv[1], Run, nullptr);
++}
+diff --git a/breakwater/apps/netbench/src/netbench.cc b/breakwater/apps/netbench/src/netbench.cc
+index 493169803c9146a3a20c410494f9cdf3bc20d071..1a9a9f59e94ecb6914f8e5c3017bf0b95d48cd4e 100644
+--- a/breakwater/apps/netbench/src/netbench.cc
++++ b/breakwater/apps/netbench/src/netbench.cc
+@@ -20,6 +20,7 @@ extern "C" {
+ #include "breakwater/msem++.h"
+ 
+ #include "synthetic_worker.h"
++#include "memory_control.h"
+ #include "loadbalancer.h"
+ #include "fanouter.h"
+ #include "m_semaphore.hpp"
+@@ -95,8 +96,6 @@ constexpr uint64_t kExperimentTime = 8000000;
+ // RTT
+ constexpr uint64_t kRTT = 10;
+ constexpr uint64_t kNumDupClient = 32;
+-// Use blocking msemaphore
+-const bool use_blocking_msem = false;
+ 
+ std::vector<double> offered_loads;
+ double offered_load;
+@@ -605,30 +604,7 @@ void RpcServer(struct srpc_ctx *ctx) {
+   if (in->req_type == CPU_BOUND) {
+     cpu_bound_workers[core_id]->Work(workn);
+   } else if (in->req_type == MEM_BOUND) {
+-    if (!use_msem) {
+-      mem_bound_workers[core_id]->Work(workn);
+-    } else {
+-      assert(msem != nullptr);
+-      if (use_blocking_msem) {
+-        // Use a blocking ASQM-version of msemaphore
+-        if (msem->WaitIfUncongested()) {
+-          mem_bound_workers[core_id]->Work(workn);
+-          msem->Post();
+-        } else {
+-          ctx->drop = true;
+-          return;
+-        }
+-      } else {
+-        // Use a non-blocking version of msemaphore
+-        if (msem->TryWait()) {
+-          mem_bound_workers[core_id]->Work(workn);
+-          msem->Post();
+-        } else {
+-          ctx->drop = true;
+-          return;
+-        }
+-      }
+-    }
++    netbench_memory_work(mem_bound_workers, workn);
+   } else if (in->req_type == LOCK_BOUND) {
+ 	  if (cong_aware_mutex_lock_if_uncongested(&mut)) {
+         lock_bound_workers[core_id]->Work(workn);
+@@ -744,6 +720,11 @@ void ServerHandler(void *arg) {
+       msem = rpc::RpcMemSemaphore::GetInstance();
+   }
+ 
++  if (!NetbenchMemoryControlInit(use_msem))
++    panic("memory-work function was not prepared by dynamic-control compiler");
++  printf("Memory control: %s, %s\n", NetbenchMemoryControlMode(),
++         use_msem ? "Wait/Post enabled" : "disabled");
++
+   // Initialize the lock object
+   cong_aware_mutex_init(&mut, CONG_AWARE_MUTEX_POLICY_QLEN);
+ 
+diff --git a/breakwater/apps/netbench/src/netbench_wire_smoke.py b/breakwater/apps/netbench/src/netbench_wire_smoke.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0dbea1b551ee8cc79609079da1955f8ca12885b9
+--- /dev/null
++++ b/breakwater/apps/netbench/src/netbench_wire_smoke.py
+@@ -0,0 +1,79 @@
++#!/usr/bin/env python3
++"""Small Linux-socket client for this revision's nocontrol/netbench wire ABI.
++
++This is a correctness probe, not a throughput benchmark. The server is the
++unchanged netbench RPC path. See breakwater/src/nc_proto.h and netbench.cc.
++"""
++from concurrent.futures import ThreadPoolExecutor
++import hashlib
++import json
++import socket
++import struct
++import sys
++
++HEADER = struct.Struct("<IIQQQ")
++PAYLOAD_SIZE = 72  # x86-64 C++ payload, including alignment padding
++CONNECTIONS = 4
++REQUESTS_PER_CONNECTION = 256
++BATCH = 16  # Below nocontrol's 64 outstanding slots per connection.
++
++
++def read_full(sock, size):
++    data = bytearray()
++    while len(data) < size:
++        part = sock.recv(size - len(data))
++        if not part:
++            raise RuntimeError("server closed before the full response")
++        data.extend(part)
++    return bytes(data)
++
++
++def connection(host, connection_id):
++    completed = {}
++    with socket.create_connection((host, 8123), timeout=5) as sock:
++        sock.settimeout(5)
++        sock.sendall(struct.pack("<i", 0))  # rpc_session_info.session_type
++        for batch in range(0, REQUESTS_PER_CONNECTION, BATCH):
++            pending = {}
++            wire = bytearray()
++            for offset in range(BATCH):
++                ident = connection_id * REQUESTS_PER_CONNECTION + batch + offset
++                payload = bytearray(PAYLOAD_SIZE)
++                struct.pack_into("<Q", payload, 0, 1)  # MEM_BOUND (native enum)
++                struct.pack_into(">QQ", payload, 8, 25, ident)  # work_itr, index
++                pending[ident] = bytes(payload[:24])
++                wire.extend(HEADER.pack(0x63727063, 0, PAYLOAD_SIZE, ident, 0))
++                wire.extend(payload)
++            sock.sendall(wire)
++            for _ in range(BATCH):
++                magic, op, size, ident, _ = HEADER.unpack(read_full(sock, HEADER.size))
++                if magic != 0x73727063 or op != 0 or size != PAYLOAD_SIZE:
++                    raise RuntimeError(f"invalid or dropped response: {(magic, op, size, ident)}")
++                response = read_full(sock, size)
++                expected = pending.pop(ident)
++                if response[:24] != expected:
++                    raise RuntimeError(f"request fields changed: {ident}")
++                capacity, = struct.unpack_from(">I", response, 64)
++                if capacity != 1:
++                    raise RuntimeError(f"expected capacity one, got {capacity}")
++                completed[ident] = response[:24]
++            if pending:
++                raise RuntimeError("missing responses")
++    return completed
++
++
++def main():
++    host = sys.argv[1]
++    with ThreadPoolExecutor(max_workers=CONNECTIONS) as pool:
++        results = list(pool.map(lambda i: connection(host, i), range(CONNECTIONS)))
++    completed = {key: value for result in results for key, value in result.items()}
++    if len(completed) != CONNECTIONS * REQUESTS_PER_CONNECTION:
++        raise RuntimeError("incorrect response count")
++    digest = hashlib.sha256(b"".join(completed[i] for i in sorted(completed))).hexdigest()
++    print(json.dumps({"requests": len(completed), "responses": len(completed),
++                      "connections": CONNECTIONS, "work_iterations": 25,
++                      "response_fields_sha256": digest}, sort_keys=True))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/breakwater/apps/netbench/src/parity-test.config b/breakwater/apps/netbench/src/parity-test.config
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff259ca0b8e580501bc04fd50dd4868a8524184b
+--- /dev/null
++++ b/breakwater/apps/netbench/src/parity-test.config
+@@ -0,0 +1,9 @@
++# One scheduler thread forces the real semaphore to capacity one.
++# The existing no-PCI iokernel on amd134 provides the shared network backend.
++host_addr 192.168.11.10
++host_netmask 255.255.255.0
++host_gateway 192.168.11.254
++runtime_kthreads 1
++runtime_spinning_kthreads 1
++runtime_guaranteed_kthreads 1
++runtime_priority lc
+diff --git a/breakwater/apps/netbench/src/run_parity.py b/breakwater/apps/netbench/src/run_parity.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..cd9cb7ce39fc9866a2426a53bb95ba68f818478b
+--- /dev/null
++++ b/breakwater/apps/netbench/src/run_parity.py
+@@ -0,0 +1,101 @@
++#!/usr/bin/env python3
++"""Run on the Linux test host after building both modes with VERIFY=0 and 1.
++
++Uses the already-running no-PCI iokernel. No daemon or machine setup is changed.
++The network smoke test uses a Linux-socket client, not a benchmark rig.
++"""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import subprocess
++import sys
++import time
++
++SRC = Path(__file__).resolve().parent
++BUILD = SRC.parent / "build-parity"
++
++
++def record_manifest(output):
++    root = SRC.parents[3]
++    files = [SRC / name for name in ["netbench.cc", "memory_control.cc",
++             "memory_control.h", "memory_control_test.cc", "synthetic_worker.cc",
++             "synthetic_worker.h", "Makefile.parity",
++             "dynamic_control/dynamic_control.cc", "dynamic_control/dynamic_control.h"]]
++    files += [root / name for name in ["libruntime.a", "libnet.a", "libbase.a",
++              "bindings/cc/librt++.a", "breakwater/libbw.a",
++              "breakwater/bindings/cc/libbw++.a", "m-semaphore/build/libmsem.a"]]
++    files += [BUILD / f"{mode}-verify{verify}" / target
++              for mode in ["hardcoded", "auto"] for verify, target in
++              [(0, "netbench"), (1, "memory_control_test")]]
++    manifest = {"uname": subprocess.check_output(["uname", "-a"], text=True).strip(),
++                "files_sha256": {str(p.relative_to(root)):
++                    hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
++    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
++
++
++def run(args, cwd, log, timeout):
++    with log.open("w") as output:
++        subprocess.run(args, cwd=cwd, stdout=output,
++                       stderr=subprocess.STDOUT, timeout=timeout, check=True)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--output", type=Path, required=True)
++    args = parser.parse_args()
++    output = args.output.resolve()
++    output.mkdir(parents=True, exist_ok=False)
++    record_manifest(output)
++    config = SRC / "parity-test.config"
++    for mode, state in [("hardcoded", "enabled"), ("auto", "enabled"),
++                        ("hardcoded", "disabled"), ("auto", "disabled"),
++                        ("auto", "toggle")]:
++        log = output / f"{mode}-{state}.log"
++        run(["sudo", "-n", "timeout", "25s",
++             str(BUILD / f"{mode}-verify1" / "memory_control_test"),
++             str(config), state], output, log, 30)
++        lines = [line for line in log.read_text().splitlines()
++                 if line.startswith("PASS ")]
++        if len(lines) != 1:
++            raise RuntimeError(f"missing PASS: {log}")
++        print(lines[0], flush=True)
++
++    network_results = []
++    for mode in ["hardcoded", "auto"]:
++        folder = output / f"network-{mode}"
++        folder.mkdir()
++        binary = BUILD / f"{mode}-verify0" / "netbench"
++        with (folder / "server.log").open("w") as server_log:
++            server = subprocess.Popen(
++                ["sudo", "-n", "timeout", "35s", str(binary), "nocontrol",
++                 str(config), "server", "msem"], cwd=folder,
++                stdout=server_log, stderr=subprocess.STDOUT)
++            try:
++                time.sleep(1)
++                if server.poll() is not None:
++                    raise RuntimeError(f"server exited: {folder}")
++                # A Linux-socket client reaches the existing no-PCI iokernel
++                # through dtap0, avoiding cross-process hairpin routing.
++                run([sys.executable, str(SRC / "netbench_wire_smoke.py"),
++                     "192.168.11.10"],
++                    folder, folder / "client.log", 30)
++            finally:
++                # Kill only this script's server, via timeout's process group
++                # leader; sudo forwards SIGTERM to its child timeout.
++                server.terminate()
++                try:
++                    server.wait(timeout=5)
++                except subprocess.TimeoutExpired:
++                    server.kill()
++                    server.wait()
++        result = json.loads((folder / "client.log").read_text())
++        network_results.append(result)
++        print(f"network {mode}: {json.dumps(result, sort_keys=True)}", flush=True)
++    if network_results[0] != network_results[1]:
++        raise RuntimeError("hardcoded and auto response results differ")
++    print("PASS: hardcoded and auto network response fields match", flush=True)
++
++
++if __name__ == "__main__":
++    main()

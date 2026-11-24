@@ -1,0 +1,2 @@
+# Generated patch context preserves upstream whitespace verbatim.
+patches/**/*.patch -whitespace

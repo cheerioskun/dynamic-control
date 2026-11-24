@@ -1,0 +1,281 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Hemant Pandey <29029002+cheerioskun@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 17:47:28 -0500
+Subject: [PATCH 2/2] Use the parent dynamic-control runtime and experiment
+ records
+
+---
+ breakwater/apps/netbench/src/Makefile.parity  |  6 ++-
+ breakwater/apps/netbench/src/PARITY.md        | 43 ++++++---------
+ breakwater/apps/netbench/src/bench_parity.py  |  6 +--
+ .../src/dynamic_control/dynamic_control.cc    | 46 ----------------
+ .../src/dynamic_control/dynamic_control.h     | 53 -------------------
+ .../apps/netbench/src/memory_control.cc       |  2 +-
+ breakwater/apps/netbench/src/run_parity.py    |  6 +--
+ 7 files changed, 28 insertions(+), 134 deletions(-)
+ delete mode 100644 breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
+ delete mode 100644 breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
+
+diff --git a/breakwater/apps/netbench/src/Makefile.parity b/breakwater/apps/netbench/src/Makefile.parity
+index 33569caf1c101d57577866200dfef9353ce46914..9dc2ae0434d5166acdd7fee45b3b8e0b8841ff69 100644
+--- a/breakwater/apps/netbench/src/Makefile.parity
++++ b/breakwater/apps/netbench/src/Makefile.parity
+@@ -2,9 +2,11 @@
+ # Existing Shenango and semaphore archives remain unchanged.
+ MODE ?= hardcoded
+ VERIFY ?= 0
+-DC_CXX ?= $(HOME)/dynamic-control/build/llvm/bin/clang++
++DC_ROOT ?= $(abspath $(ROOT_PATH)/../..)
++DC_CXX ?= $(DC_ROOT)/build/llvm/bin/clang++
+ BUILD_PATH := ../build-parity/$(MODE)-verify$(VERIFY)
+ include Makefile
++INC += -I$(DC_ROOT)/runtime
+ 
+ ifeq ($(filter $(MODE),hardcoded auto),)
+ $(error MODE must be hardcoded or auto)
+@@ -24,7 +26,7 @@ endif
+ 
+ # Extra prerequisites are added after Makefile's original rules.
+ $(netbench_tgt): $(lib_obj)
+-$(BUILD_PATH)/dynamic_control.o: dynamic_control/dynamic_control.cc dynamic_control/dynamic_control.h
++$(BUILD_PATH)/dynamic_control.o: $(DC_ROOT)/runtime/dynamic_control.cc $(DC_ROOT)/runtime/dynamic_control.h
+ 	@mkdir -p $(BUILD_PATH)
+ 	$(CXX) $(CXXFLAGS) -c $< -o $@
+ 
+diff --git a/breakwater/apps/netbench/src/PARITY.md b/breakwater/apps/netbench/src/PARITY.md
+index 44efbac809d75773c9c2c72a973a6a114c2bb21d..9c8068a82782725d8c0785def439cc6de26bafcc 100644
+--- a/breakwater/apps/netbench/src/PARITY.md
++++ b/breakwater/apps/netbench/src/PARITY.md
+@@ -17,10 +17,11 @@ before accepting requests. `server no_msem` bypasses acquisition in both modes.
+ An auto build fails startup if its compiler did not prepare the function.
+ The `PROFILE_ST` calibration path stays outside the instrumented boundary.
+ 
+-The registry in `dynamic_control/` is copied from `dynamic-control` commit
+-`c8e6b7b7949664a56085adfe4886eb33981b51f3`. Its header drops the unused mock
+-permit-query declaration and describes the real semaphore hooks. The compiler
+-ABI is unchanged. No OS-thread TLS is used for permit accounting.
++The dispatch registry and ABI header are compiled directly from the parent
++`dynamic-control/runtime/`. The application supplies only its semaphore hooks.
++No OS-thread TLS is used for permit accounting. The original measured integration
++is preserved in the first application patch; the next patch changes repository
++paths and shares the parent registry without changing its implementation.
+ 
+ ## Build on Linux
+ 
+@@ -33,8 +34,8 @@ make -f Makefile.parity MODE=hardcoded VERIFY=1 selftest
+ make -f Makefile.parity MODE=auto VERIFY=1 selftest
+ ```
+ 
+-`DC_CXX` defaults to `$HOME/dynamic-control/build/llvm/bin/clang++`; override it
+-with the patched Clang path if needed. Both application builds use that same
++`DC_ROOT` defaults to the containing dynamic-control checkout; `DC_CXX` uses
++its `build/llvm/bin/clang++`. Override these paths when building elsewhere. Both application builds use that same
+ compiler and flags. The parity Makefile targets the test machine's Zen 2 CPU,
+ removing AVX-512 and user-interrupt flags. It reuses the existing runtime,
+ RPC, semaphore, PCM, and NIC archives. Production binaries have no test counters.
+@@ -69,23 +70,13 @@ The network probe speaks this revision's x86-64 nocontrol wire ABI on port 8123.
+ It uses the host's dtap route to the no-PCI iokernel. It is a correctness test,
+ not a substitute for the original load generator or a performance measurement.
+ 
+-## Recorded result
+-
+-On `hemantp@amd134.utah.cloudlab.us` (EPYC 7302P, Linux 6.8.0-149-generic),
+-using patched Clang 23.1.6, all five runtime cases and both network cases passed.
+-Enabled hardcoded and auto each reported 640 calls, sum 10560, 640 acquisitions,
+-640 releases, and zero active permits. Disabled cases did the same work with
+-zero acquisitions. The toggle case finished three calls with two balanced
+-acquisitions. Each server returned all 1,024 network responses with the same
+-echoed-field hash. Saved logs and source/archive/binary hashes are in
+-`../parity/results/amd134/`.
+-
+-Remote working copy: `/users/hemantp/svalinn-shenango-dc`. The original
+-`/local/shenango` deployment and its running iokernel were left in place.
+-This establishes the exercised behavior at a function boundary and through
+-netbench RPCs. It does not establish throughput parity or multi-core scaling.
+-
+-Subsequent worker and RPC measurements, with raw samples and reproduction
+-commands, are recorded in `../parity/performance/amd134/RESULTS.md`.
+-The multicore extension, including 2/4/8/16 scheduler-thread measurements with
+-no permit TLS, is recorded in `../parity/performance/amd134/MULTICORE.md`.
++## Experiment and results
++
++The parent repository owns the experiment statement, historical results, raw
++samples, provenance, and reproduction instructions:
++
++[Shenango instrumentation parity](../../../../../../experiments/shenango/README.md).
++
++Both variants use the same workload, real semaphore, controller, counters, and
++machine configuration. The two questions are correctness parity with explicit
++`Wait()/work/Post()`, and similar performance. No permit TLS is used.
+diff --git a/breakwater/apps/netbench/src/bench_parity.py b/breakwater/apps/netbench/src/bench_parity.py
+index f5725d9890e1e6506a97bb9973ece5ed84f799c8..f09ee00ccc6ebb9a8697f277d93cfea57b4b1831 100644
+--- a/breakwater/apps/netbench/src/bench_parity.py
++++ b/breakwater/apps/netbench/src/bench_parity.py
+@@ -26,8 +26,8 @@ def main():
+     output.mkdir(parents=True, exist_ok=False)
+     files = [SRC / name for name in ["memory_control_bench.cc", "memory_control.cc",
+              "memory_control.h", "synthetic_worker.cc", "synthetic_worker.h",
+-             "Makefile.parity", "parity-test.config", "bench_parity.py",
+-             "dynamic_control/dynamic_control.cc", "dynamic_control/dynamic_control.h"]]
++             "Makefile.parity", "parity-test.config", "bench_parity.py"]]
++    files += [ROOT.parents[1] / "runtime" / name for name in ["dynamic_control.cc", "dynamic_control.h"]]
+     files += [ROOT / name for name in ["libruntime.a", "libnet.a", "libbase.a",
+               "bindings/cc/librt++.a", "m-semaphore/build/libmsem.a",
+               "m-semaphore/deps/pcm/build/src/libpcm.a", "build/config", "build/shared.mk"]]
+@@ -35,7 +35,7 @@ def main():
+               for mode in ["hardcoded", "auto"]]
+     manifest = {"source_commit": args.source_commit,
+                 "repetitions": args.repetitions,
+-                "files_sha256": {str(p.relative_to(ROOT)): sha256(p) for p in files}}
++                "files_sha256": {str(p): sha256(p) for p in files}}
+     for command in [["uname", "-a"], ["lscpu"],
+                     [str(Path.home() / "dynamic-control/build/llvm/bin/clang++"), "--version"]]:
+         manifest[command[0]] = subprocess.check_output(command, text=True)
+diff --git a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
+deleted file mode 100644
+index 8412624facb3b3cf6dfb5de51826872e5b08a41d..0000000000000000000000000000000000000000
+--- a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc
++++ /dev/null
+@@ -1,46 +0,0 @@
+-#include "dynamic_control.h"
+-
+-#include <cstring>
+-#include <type_traits>
+-
+-static_assert(std::is_standard_layout_v<DcFunction>);
+-static_assert(sizeof(DcEntry) == sizeof(void *));
+-static_assert(sizeof(DcFunction) == 4 * sizeof(void *));
+-static_assert(offsetof(DcFunction, body) == sizeof(void *));
+-static_assert(offsetof(DcFunction, guard) == 2 * sizeof(void *));
+-static_assert(offsetof(DcFunction, target) == 3 * sizeof(void *));
+-static_assert(sizeof(DcModule) == 3 * sizeof(void *));
+-static_assert(offsetof(DcModule, count) == sizeof(void *));
+-static_assert(offsetof(DcModule, next) == 2 * sizeof(void *));
+-static_assert(__atomic_always_lock_free(sizeof(DcEntry), nullptr));
+-
+-namespace {
+-// Module constructors register their tables before main.
+-DcModule *modules = nullptr;
+-}
+-
+-extern "C" void __dc_register_module(DcModule *module) noexcept {
+-  module->next = modules;
+-  modules = module;
+-}
+-
+-extern "C" const DcFunction *dc_find(const char *name) noexcept {
+-  for (auto *module = modules; module; module = module->next) {
+-    for (size_t i = 0; i < module->count; ++i) {
+-      const auto *function = &module->functions[i];
+-      if (std::strcmp(name, function->name) == 0)
+-        return function;
+-    }
+-  }
+-  return nullptr;
+-}
+-
+-extern "C" void dc_enable(const DcFunction *function) noexcept {
+-  // Match compiler-emitted LLVM atomic pointer loads without pretending the
+-  // compiler's raw pointer global is a constructed std::atomic object.
+-  __atomic_store_n(function->target, function->guard, __ATOMIC_RELEASE);
+-}
+-
+-extern "C" void dc_disable(const DcFunction *function) noexcept {
+-  __atomic_store_n(function->target, function->body, __ATOMIC_RELEASE);
+-}
+diff --git a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h b/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
+deleted file mode 100644
+index 64b43427551c0a493ce6cca4176328dd7790c23c..0000000000000000000000000000000000000000
+--- a/breakwater/apps/netbench/src/dynamic_control/dynamic_control.h
++++ /dev/null
+@@ -1,53 +0,0 @@
+-#ifndef DYNAMIC_CONTROL_H
+-#define DYNAMIC_CONTROL_H
+-
+-#include <stddef.h>
+-#include <stdbool.h>
+-
+-#ifdef __cplusplus
+-#define DC_NOEXCEPT noexcept
+-extern "C" {
+-#else
+-#define DC_NOEXCEPT
+-#endif
+-
+-// Erased addresses are stored, never called through this type. Dispatchers
+-// restore the original signature. Slot accesses must always be atomic.
+-typedef void (*DcEntry)(void);
+-
+-// Compiler ABI: four pointer-sized fields, in this order. Descriptors are
+-// immutable; each target points to a separate, pointer-aligned writable slot.
+-typedef struct DcFunction {
+-  const char *name;
+-  DcEntry body;
+-  DcEntry guard;
+-  DcEntry *target;
+-} DcFunction;
+-
+-// One registration node per module, linked by its constructor before main.
+-// Nodes and descriptors live until exit.
+-typedef struct DcModule {
+-  const DcFunction *functions;
+-  size_t count;
+-  struct DcModule *next;
+-} DcModule;
+-
+-void __dc_register_module(DcModule *module) DC_NOEXCEPT;
+-
+-// Exact, unique LLVM/linkage names. Missing names return NULL.
+-// Call after startup registration. Handles remain valid until exit.
+-const DcFunction *dc_find(const char *name) DC_NOEXCEPT;
+-// Require a non-null handle returned by dc_find. Future entries select the
+-// published destination; calls racing with a toggle can take either path.
+-void dc_enable(const DcFunction *function) DC_NOEXCEPT;
+-void dc_disable(const DcFunction *function) DC_NOEXCEPT;
+-
+-// Netbench's backend uses the existing blocking MemSemaphore singleton.
+-void dc_acquire(const DcFunction *function) DC_NOEXCEPT;
+-void dc_release(const DcFunction *function) DC_NOEXCEPT;
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-#undef DC_NOEXCEPT
+-#endif
+diff --git a/breakwater/apps/netbench/src/memory_control.cc b/breakwater/apps/netbench/src/memory_control.cc
+index 63380a784618d684740c0c420ab91ca20f104fb0..56bb1bcb5f5da2a683b3d4c26139613602a7889d 100644
+--- a/breakwater/apps/netbench/src/memory_control.cc
++++ b/breakwater/apps/netbench/src/memory_control.cc
+@@ -7,7 +7,7 @@ extern "C" {
+ }
+ 
+ #ifdef NETBENCH_DC_AUTO
+-#include "dynamic_control/dynamic_control.h"
++#include "dynamic_control.h"
+ #endif
+ #ifdef NETBENCH_DC_VERIFY
+ #include <atomic>
+diff --git a/breakwater/apps/netbench/src/run_parity.py b/breakwater/apps/netbench/src/run_parity.py
+index cd9cb7ce39fc9866a2426a53bb95ba68f818478b..5baa1277f297d56fddca5e6417ebc41d0ae4f864 100644
+--- a/breakwater/apps/netbench/src/run_parity.py
++++ b/breakwater/apps/netbench/src/run_parity.py
+@@ -20,8 +20,8 @@ def record_manifest(output):
+     root = SRC.parents[3]
+     files = [SRC / name for name in ["netbench.cc", "memory_control.cc",
+              "memory_control.h", "memory_control_test.cc", "synthetic_worker.cc",
+-             "synthetic_worker.h", "Makefile.parity",
+-             "dynamic_control/dynamic_control.cc", "dynamic_control/dynamic_control.h"]]
++             "synthetic_worker.h", "Makefile.parity"]]
++    files += [root.parents[1] / "runtime" / name for name in ["dynamic_control.cc", "dynamic_control.h"]]
+     files += [root / name for name in ["libruntime.a", "libnet.a", "libbase.a",
+               "bindings/cc/librt++.a", "breakwater/libbw.a",
+               "breakwater/bindings/cc/libbw++.a", "m-semaphore/build/libmsem.a"]]
+@@ -29,7 +29,7 @@ def record_manifest(output):
+               for mode in ["hardcoded", "auto"] for verify, target in
+               [(0, "netbench"), (1, "memory_control_test")]]
+     manifest = {"uname": subprocess.check_output(["uname", "-a"], text=True).strip(),
+-                "files_sha256": {str(p.relative_to(root)):
++                "files_sha256": {str(p):
+                     hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
+     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+ 

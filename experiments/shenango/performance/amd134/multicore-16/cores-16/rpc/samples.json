@@ -1,0 +1,82 @@
+[
+  {
+    "elapsed_s": 2.0009160039990093,
+    "responses": 114768,
+    "responses_per_second": 57357.73004495237,
+    "client_cpu_s": 1.4413451830000001,
+    "repetition": 0,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.000944557999901,
+    "responses": 114944,
+    "responses_per_second": 57444.86999424683,
+    "client_cpu_s": 1.476219545,
+    "repetition": 0,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0007340720003413,
+    "responses": 115360,
+    "responses_per_second": 57658.83713104493,
+    "client_cpu_s": 1.4401394939999999,
+    "repetition": 1,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.000807590000477,
+    "responses": 116448,
+    "responses_per_second": 58200.49892952087,
+    "client_cpu_s": 1.666216603,
+    "repetition": 1,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0010882879978453,
+    "responses": 121248,
+    "responses_per_second": 60591.029754770396,
+    "client_cpu_s": 1.7284344649999999,
+    "repetition": 2,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0010381739994045,
+    "responses": 112992,
+    "responses_per_second": 56466.68887588829,
+    "client_cpu_s": 1.5922285729999999,
+    "repetition": 2,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.000698526000633,
+    "responses": 115200,
+    "responses_per_second": 57579.88947504405,
+    "client_cpu_s": 1.4613379320000002,
+    "repetition": 3,
+    "mode": "auto"
+  },
+  {
+    "elapsed_s": 2.0006148379980004,
+    "responses": 114976,
+    "responses_per_second": 57470.332527902065,
+    "client_cpu_s": 1.568565643,
+    "repetition": 3,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.000727229999029,
+    "responses": 115104,
+    "responses_per_second": 57531.08083606972,
+    "client_cpu_s": 1.501371394,
+    "repetition": 4,
+    "mode": "hardcoded"
+  },
+  {
+    "elapsed_s": 2.0006682090024697,
+    "responses": 115776,
+    "responses_per_second": 57868.66581826966,
+    "client_cpu_s": 1.6434375749999999,
+    "repetition": 4,
+    "mode": "auto"
+  }
+]

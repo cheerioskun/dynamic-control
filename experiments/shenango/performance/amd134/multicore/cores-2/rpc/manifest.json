@@ -1,0 +1,18 @@
+{
+  "source_commit": "37f0de4",
+  "seconds": 2,
+  "cores": 2,
+  "client_processes": 4,
+  "repetitions": 5,
+  "connections": 4,
+  "batch": 16,
+  "work_iterations": 25,
+  "enabled": true,
+  "files_sha256": {
+    "/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/build-parity/hardcoded-verify0/netbench": "536b44569e9bf540087bba8a908f618eec75368761f28d78bdca68ec5b17b4e5",
+    "/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/build-parity/auto-verify0/netbench": "48d94e78aea075234660463b7302727b6001913d5e2b6592674f1f703b446fde",
+    "/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/src/bench_netbench_rpc.py": "7aeea311086c78a8cc1e0b15820e99937aadb49cda113534354a031882c5bc23",
+    "/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/src/netbench_wire_smoke.py": "4f6feea673478ae3276da4c28a17b833e9b186c19de89a1b3044940f96a540f5",
+    "/users/hemantp/svalinn-shenango-dc/parity-results/multicore-1/cores-2/server.config": "fc645f61788c797a57f255b6072702cc29b3350588d1ec1f7d063626fe301b33"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "uname": "Linux node0.llvm-ext.cc-profiler-pg0.utah.cloudlab.us 6.8.0-149-generic #149-Ubuntu SMP PREEMPT_DYNAMIC Fri Oct 23 13:21:10 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux",
+  "files_sha256": {
+    "breakwater/apps/netbench/src/netbench.cc": "09ce1b84b00bad3cc2a3c29ac7a159c15ee64c4e4d0abfd1b47f905f0b0b8cd2",
+    "breakwater/apps/netbench/src/memory_control.cc": "ae3cd56834ad0031cf9e65a6d9528ab3c6bbf52c96bf8e661d93eb1c10e086cc",
+    "breakwater/apps/netbench/src/memory_control.h": "2b5f852f87b15228700b5d4800fb1437002f363afea810663c2a93789e9b2d56",
+    "breakwater/apps/netbench/src/memory_control_test.cc": "1418d110386391380519b9933f8dac6bf8ec4ee4d7af20f46c0b96d20fe9cb87",
+    "breakwater/apps/netbench/src/synthetic_worker.cc": "5c1e4f3e4bb8d3691c8ef12840b49c81fa19c90a03df5171c3c5d80dd7a3c978",
+    "breakwater/apps/netbench/src/synthetic_worker.h": "a92e5d63acf77aa1c8ec1a030753f46f90b053792ef49d0fb859bc323d974e56",
+    "breakwater/apps/netbench/src/Makefile.parity": "a6094bc0add6b04f0c920d4422f40cd4a13e29f73b6a947ee8d5f1046ec81c18",
+    "breakwater/apps/netbench/src/dynamic_control/dynamic_control.cc": "61f14e7fa6498a3d25ff0031434c19c16346a1a27ebc6500d989e214262a8297",
+    "breakwater/apps/netbench/src/dynamic_control/dynamic_control.h": "7677374485b1631a4625d3a1dbd20f49d3dd71d5ddb8b4b1a61547b944248682",
+    "libruntime.a": "69e0f5f41860bac761825f9d977bcfb685cc61b1e93cfe47976bdde851a64c6a",
+    "libnet.a": "7876baebe85dcb21f5b386927156ed266fd046b59de4437274f112fa66510896",
+    "libbase.a": "f8df3a0429c15e9fefe5a5b63b69b33022bcd46db9c4fbef6e217e1d11002f23",
+    "bindings/cc/librt++.a": "ee8b6cc9edbc7fa8e8f355be6825455bc6f9f3f4ecae186e0a5067ee5b231edd",
+    "breakwater/libbw.a": "900e791e56fa8a8ae0a6d01ad8f28578820cccfece724a39cc9a014548343137",
+    "breakwater/bindings/cc/libbw++.a": "4fc9c3a4def7816c70253653f761d52fb6db1899b3029ed3f76c3355c2b402fa",
+    "m-semaphore/build/libmsem.a": "3f404aa4133c0a2bc1d1e2982510f82fb02227f9b7a48ca77b60531202c8f7a6",
+    "breakwater/apps/netbench/build-parity/hardcoded-verify0/netbench": "536b44569e9bf540087bba8a908f618eec75368761f28d78bdca68ec5b17b4e5",
+    "breakwater/apps/netbench/build-parity/hardcoded-verify1/memory_control_test": "b74e537bca80fd91055cd9d5981febe5e73a345a5664f7360138ba76bec05bf5",
+    "breakwater/apps/netbench/build-parity/auto-verify0/netbench": "48d94e78aea075234660463b7302727b6001913d5e2b6592674f1f703b446fde",
+    "breakwater/apps/netbench/build-parity/auto-verify1/memory_control_test": "43d1791c2fbdbf7e45ab127f5d08ac5f7223067f1d3cdb35746c46c7d634b5a9"
+  }
+}

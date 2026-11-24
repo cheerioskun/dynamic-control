@@ -50,3 +50,22 @@ source edits; checks use an isolated index. Run `make setup` in every clone to
 activate the hooks.
 
 For a detached Linux build and benchmark, see [the node runner](../bench/README.md#detached-linux-node-run).
+
+## Shenango application patches
+
+The same dependency-patch engine backs `scripts/llvm.py` and
+`scripts/shenango.py`. `shenango.json` records upstream; the staged
+`third_party/svalinn-shenango` gitlink must match it. `make setup-shenango`
+prepares the application and installs its post-commit export hook.
+`make check-shenango-patches` reconstructs its patch series in a temporary Git
+index without touching source or the developer index. Neither setup command
+automatically builds the application's nested dependencies.
+
+Edit and commit inside the prepared application submodule, then commit the
+generated patch files in the parent. Preserve the upstream gitlink rather than
+staging the local patched HEAD. Parent commits check both patch series and can
+be blocked by unfinished edits inside either dependency. Do not reset unrelated
+compiler work to record an application change.
+
+The [experiment entry point](../experiments/shenango/README.md) owns verification
+scope, provenance, results, and application reproduction commands.

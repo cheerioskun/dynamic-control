@@ -6,6 +6,10 @@ functions. Dispatch uses atomic function pointers. No frame-lowering changes.
 [Start at the checkpoint](CHECKPOINT.md) for a reading order, design choices,
 saved artifacts, and verification commands.
 
+[Shenango experiment](experiments/shenango/README.md): verify correctness parity
+with hardcoded `Wait()/work/Post()` and similar performance. The application is
+a pinned submodule with a patch series, and the results live in this repository.
+
 ## Build and run
 
 Requires Git, Python 3, CMake, Ninja, and a C++17 compiler.
@@ -52,6 +56,11 @@ and execute their release hook.
 
 [Results](bench/RESULTS.md) include samples and disassembly checks. The fixture
 measures baseline, unhooked, and hooked calls in one binary.
+
+[Shenango results](experiments/shenango/README.md#evidence) cover the real blocking
+semaphore and netbench request path, including multicore comparisons without
+permit TLS. `make setup-shenango` prepares the application dependency;
+`make check-shenango-patches` verifies its patches.
 
 LLVM stays pinned to unmodified upstream source. Compiler edits are committed
 locally inside the submodule and exported to `patches/llvm/`, following

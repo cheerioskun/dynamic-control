@@ -1,0 +1,17 @@
+CPU 22| <5> cpu: detected 32 cores, 1 nodes
+[  0.000643] CPU 22| <5> loading configuration from '/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/src/parity-test.config'
+[  0.000676] CPU 22| <5> cfg: provisioned 1 cores (1 guaranteed, 0 burstable, 1 spinning)
+[  0.000677] CPU 22| <5> cfg: task is latency critical (LC)
+[  0.000677] CPU 22| <5> cfg: THRESH_QD: 10, THRESH_HT: 0 THRESH_QUANTUM: 100
+[  0.000679] CPU 22| <5> cfg: storage disabled, directpath disabled
+[  0.000685] CPU 22| <5> process pid: 30411
+[  0.007715] CPU 22| <5> shm: using 69206016 bytes
+[  0.007755] CPU 22| <5> net: started network stack
+[  0.007756] CPU 22| <5> net: using the following configuration:
+[  0.007757] CPU 22| <5>   addr:	192.168.11.10
+[  0.007758] CPU 22| <5>   netmask:	255.255.255.0
+[  0.007758] CPU 22| <5>   gateway:	192.168.11.254
+[  0.007759] CPU 22| <5>   mac:		62:87:04:4E:1F:F8
+[  0.007760] CPU 22| <5>   mtu:		1500
+[  0.008265] CPU 22| <5> spawning 1 kthreads
+Using MAB Epsilon Greedy Memory Semaphore Implementation

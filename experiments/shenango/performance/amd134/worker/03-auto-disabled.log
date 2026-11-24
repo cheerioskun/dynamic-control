@@ -1,0 +1,18 @@
+CPU 20| <5> cpu: detected 32 cores, 1 nodes
+[  0.000612] CPU 20| <5> loading configuration from '/users/hemantp/svalinn-shenango-dc/breakwater/apps/netbench/src/parity-test.config'
+[  0.000645] CPU 20| <5> cfg: provisioned 1 cores (1 guaranteed, 0 burstable, 1 spinning)
+[  0.000646] CPU 20| <5> cfg: task is latency critical (LC)
+[  0.000647] CPU 20| <5> cfg: THRESH_QD: 10, THRESH_HT: 0 THRESH_QUANTUM: 100
+[  0.000648] CPU 20| <5> cfg: storage disabled, directpath disabled
+[  0.000654] CPU 20| <5> process pid: 30195
+[  0.008463] CPU 20| <5> shm: using 69206016 bytes
+[  0.008497] CPU 20| <5> net: started network stack
+[  0.008497] CPU 20| <5> net: using the following configuration:
+[  0.008499] CPU 20| <5>   addr:	192.168.11.10
+[  0.008500] CPU 20| <5>   netmask:	255.255.255.0
+[  0.008500] CPU 20| <5>   gateway:	192.168.11.254
+[  0.008500] CPU 20| <5>   mac:		62:87:04:4E:1F:F8
+[  0.008501] CPU 20| <5>   mtu:		1500
+[  0.008934] CPU 20| <5> spawning 1 kthreads
+BENCH {"mode":"autoinstrumented","enabled":false,"iterations":1,"calls":163575,"elapsed_ns":283224408,"ns_per_call":1731.465126}
+BENCH {"mode":"autoinstrumented","enabled":false,"iterations":25,"calls":6923,"elapsed_ns":299729908,"ns_per_call":43294.801098}

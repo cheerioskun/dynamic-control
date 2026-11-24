@@ -1,0 +1,47 @@
+[
+  {
+    "cores": 2,
+    "hardcoded_worker_median_rps": 22306.398911,
+    "auto_worker_median_rps": 22298.192807,
+    "worker_paired_median_percent": -0.016918163326395952,
+    "worker_paired_min_percent": -0.0673599596530905,
+    "worker_paired_max_percent": 0.013109556190493699,
+    "rpc": {
+      "hardcoded_median_rps": 22237.25979517607,
+      "auto_median_rps": 22247.000656031916,
+      "paired_median_percent": -0.0223986915988017,
+      "paired_min_percent": -0.7918749665852376,
+      "paired_max_percent": 0.24311559217145007
+    }
+  },
+  {
+    "cores": 4,
+    "hardcoded_worker_median_rps": 23806.691715,
+    "auto_worker_median_rps": 23917.176333,
+    "worker_paired_median_percent": 0.4640905982345567,
+    "worker_paired_min_percent": -0.9319390909291569,
+    "worker_paired_max_percent": 1.2249134927209138,
+    "rpc": {
+      "hardcoded_median_rps": 23189.408681897887,
+      "auto_median_rps": 23153.665124950676,
+      "paired_median_percent": -0.1616207020561755,
+      "paired_min_percent": -0.4796029701092275,
+      "paired_max_percent": 1.3429175253271586
+    }
+  },
+  {
+    "cores": 8,
+    "hardcoded_worker_median_rps": 48427.513939,
+    "auto_worker_median_rps": 48383.643716,
+    "worker_paired_median_percent": -1.0259381886359331,
+    "worker_paired_min_percent": -4.617796670618812,
+    "worker_paired_max_percent": 1.0538977730090826,
+    "rpc": {
+      "hardcoded_median_rps": 46542.592282532656,
+      "auto_median_rps": 46174.08890212088,
+      "paired_median_percent": -0.0969644776384837,
+      "paired_min_percent": -2.8553369229594505,
+      "paired_max_percent": 1.2379914727445485
+    }
+  }
+]
