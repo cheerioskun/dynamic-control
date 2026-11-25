@@ -38,9 +38,40 @@ See [development](docs/development.md) and [bench](bench/README.md).
 Docker standardizes the build environment. Timings still belong to the machine
 running it; Docker Desktop on a Mac runs Linux in a VM.
 
-Shenango still needs a prepared Linux host: its kernel module, hugepages, and
-network/device setup are outside the image. Its container setup is not wired
-into this image yet.
+## Shenango container
+
+`cheerioskun/dynamic-control:shenango` includes the runtime, iokernel, and both
+netbench variants for Linux amd64. To build it locally, the optional `shenango`
+target uses the recipe from the sibling `cloudlab-templates` checkout:
+
+```sh
+docker build --target shenango \
+  --build-context cloudlab=../cloudlab-templates/shenango \
+  --build-arg DC_BUILD_JOBS=16 -t cheerioskun/dynamic-control:shenango .
+```
+
+Run on a dedicated compatible x86-64 Ubuntu 24.04 / Linux 6.8 host with matching
+kernel headers installed:
+
+```sh
+docker run --rm -it --privileged --pid=host --network=host \
+  --ulimit memlock=-1:-1 \
+  -v /lib/modules:/lib/modules:ro -v /usr/src:/usr/src:ro \
+  cheerioskun/dynamic-control:shenango
+```
+
+Startup builds/loads the host's `ksched` module, prepares hugepages and CPU policy,
+and starts the iokernel in local TAP mode. Normal exit stops its helpers and restores
+host settings. The shell contains the built applications; for example:
+
+```sh
+/local/shenango/breakwater/apps/netbench/build-parity/auto/netbench \
+  nocontrol /run/shenango/runtime.config server msem
+```
+
+Use `hardcoded` in that path for the explicit Wait/Post wrapper. Both versions
+use the real semaphore. This packages userspace, not a kernel or physical NIC
+configuration. The default image remains the multiarchitecture microbenchmark image.
 
 ## Select and toggle functions
 

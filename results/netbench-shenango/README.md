@@ -90,3 +90,47 @@ This checked the instrumentation mechanism. It did not establish that Svalinn's
 control policy benefits this workload. Capacity was adaptive, and we did not
 record its trajectory, so the scaling curve is not a diagnosis of the controller.
 We also did not measure request latency or open-loop overload behavior.
+
+## Inside Docker
+
+On November 24 we tested CloudLab xl170 `hp097.utah.cloudlab.us`, a Xeon
+E5-2640 v4 with 10 physical cores / 20 hardware threads and stock Ubuntu Linux 6.8.
+The optional Dockerfile target builds Shenango userspace with generic DPDK and
+`x86-64-v2` application code. It reused the compiled LLVM layer.
+
+The container used privileged mode, host PIDs/networking, unlimited memlock,
+and read-only mounts of host modules/headers. Startup builds ksched for that
+kernel, reserves hugepages, mounts hugetlbfs, and runs the iokernel and PM QoS
+helper directly. Host IPC sharing and systemd inside the container were unnecessary.
+Host PIDs fixed stalled scheduling. The recipe's MWAIT check needed C1, not C0;
+startup also creates device nodes for modules loaded after Docker starts.
+
+Runtime attachment, scheduling/timers, and a 32-payload host TCP echo passed.
+The initial hardcoded and generated smoke each completed 2,304 memory-work RPCs,
+with blocking Wait/Post and work observed on all 18 runtime CPUs.
+
+For throughput we used five paired runs per scheduler count, alternating order,
+with four colocated Linux client processes and batches of 16 requests each.
+Each run had one second of startup/warmup and a three-second measurement window.
+The workload remained 25 iterations over 32 KiB, with the real adaptive semaphore.
+Response headers, IDs, and payload identity were checked throughout.
+
+| Scheduler threads | Hardcoded | Generated |
+|---:|---:|---:|
+| 2 | 16,058 requests/s | 16,061 requests/s |
+| 4 | 31,219 requests/s | 31,148 requests/s |
+| 8 | 59,481 requests/s | 60,000 requests/s |
+| 16 | 59,064 requests/s | 59,071 requests/s |
+| 18 | 55,497 requests/s | 55,520 requests/s |
+
+These are independent medians. Median paired differences stayed within 0.6%,
+but one 18-thread hardcoded sample fell to 49,225 requests/s, producing a 12.4%
+paired difference. We retained it. This supports similar performance, not a
+precise overhead estimate. Scheduler counts include SMT siblings; 18 threads
+use nine physical cores, with the other core serving the iokernel.
+
+Scaling to eight threads and then plateauing is plausible: 60k RPC/s implies
+about 49 GB/s of requested non-temporal stores. That is workload arithmetic,
+not measured DRAM bandwidth or proof of the bottleneck. We did not establish
+policy benefit, container overhead versus native, or physical-NIC performance.
+Startup/exit checks also verified module unloading and restoration of host settings.

@@ -33,11 +33,12 @@ new file mode 100644
 index 0000000..e61d345
 --- /dev/null
 +++ b/breakwater/apps/netbench/src/Makefile.parity
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,29 @@
 +# Hardcoded and compiler-generated control around the same netbench work.
 +MODE ?= hardcoded
 +DC_ROOT ?= $(abspath $(ROOT_PATH)/../..)
 +DC_CXX ?= $(DC_ROOT)/build/llvm/bin/clang++
++DC_ARCH ?= native
 +BUILD_PATH := ../build-parity/$(MODE)
 +include Makefile
 +INC += -I$(DC_ROOT)/runtime
@@ -47,8 +48,8 @@ index 0000000..e61d345
 +endif
 +CXX := $(DC_CXX)
 +LDXX := $(DC_CXX)
-+# The AMD test machine has neither AVX-512 nor user interrupts.
-+FLAGS := $(filter-out -mavx512f -muintr -flto,$(FLAGS)) -march=znver2
++# Use the build host's ISA; neither AVX-512 nor user interrupts are required.
++FLAGS := $(filter-out -mavx512f -muintr -flto,$(FLAGS)) -march=$(DC_ARCH)
 +LDFLAGS := $(filter-out -flto,$(LDFLAGS))
 +ifeq ($(MODE),auto)
 +$(BUILD_PATH)/memory_control.o: CXXFLAGS += -DNETBENCH_DC_AUTO -mllvm -dc-enable
