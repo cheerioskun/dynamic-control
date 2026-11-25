@@ -1,0 +1,6 @@
+.git
+.envrc
+build
+third_party
+**/__pycache__
+**/*.pyc

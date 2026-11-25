@@ -46,3 +46,17 @@ These are small-function measurements of dispatch and empty hooks, not the
 cost of a semaphore or evidence of application benefit. With full LTO, empty
 hook calls may disappear; the numbers above are non-LTO. For behavior and
 performance with a real semaphore, see [netbench on Shenango](../netbench-shenango/README.md).
+
+On November 24 we checked the Docker workflow on `hp097.utah.cloudlab.us`
+(xl170, Linux amd64, 20 build threads) and the M5's Docker Desktop Linux arm64
+VM (four build threads). Both images passed runtime/compiler checks and ran
+`make bench` with networking disabled, without rebuilding LLVM.
+The sanity-run medians were:
+
+| Docker host | Baseline | Unhooked | Hooked |
+|---|---:|---:|---:|
+| CloudLab xl170 | 1.483 ns | 1.785 ns | 5.041 ns |
+| M5 Linux VM | 0.702 ns | 0.701 ns | 1.875 ns |
+
+These check that the packaged benchmark works; they are not a controlled
+comparison with the native runs above.

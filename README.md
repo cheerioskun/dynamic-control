@@ -11,19 +11,36 @@ comparison with hardcoded instrumentation, its results, and the application patc
 
 ## Build and run
 
-Requires Git, Python 3, CMake, Ninja, and a C++17 compiler.
+```sh
+docker run --rm -it cheerioskun/dynamic-control
+```
+
+Inside the container:
 
 ```sh
-make setup
-make compiler
-make test test-compiler
 make bench
 ```
 
-`DC_BUILD_JOBS` controls compiler build parallelism (default 2). The compiler
-builds the native backend. See [development](docs/development.md) for the patch
-workflow and local tool installation, and [benchmarks](bench/README.md) for the
-empty-hook microbenchmark.
+The image includes the built patched compiler, dependencies, and benchmark
+source. Building the image takes time; running the benchmark does not rebuild
+LLVM. `make test test-compiler` runs the behavior checks.
+
+The published image supports Linux amd64 and arm64. To build it yourself:
+
+```sh
+docker build --build-arg DC_BUILD_JOBS=8 -t cheerioskun/dynamic-control .
+```
+
+For native development, install Git, Python 3, CMake, Ninja, and a C++ compiler,
+then run `make compiler`. `DC_BUILD_JOBS` controls build parallelism (default 2).
+See [development](docs/development.md) and [bench](bench/README.md).
+
+Docker standardizes the build environment. Timings still belong to the machine
+running it; Docker Desktop on a Mac runs Linux in a VM.
+
+Shenango still needs a prepared Linux host: its kernel module, hugepages, and
+network/device setup are outside the image. Its container setup is not wired
+into this image yet.
 
 ## Select and toggle functions
 
@@ -56,7 +73,5 @@ and execute their release hook.
 [Hook-overhead results](results/hook-overhead/README.md) compare baseline,
 unhooked, and empty-hook calls. The microbenchmark code lives in `bench/`.
 
-LLVM stays pinned to unmodified upstream source. Compiler edits are committed
-locally inside the submodule and exported to `patches/llvm/`, following
-[LDB's workflow](https://github.com/cheerioskun/ldb). See
-[the checkpoint](CHECKPOINT.md) and [development commands](docs/development.md).
+The LLVM release is selected in `toolchain.json`; compiler changes live in
+`patches/llvm/`. Setup applies them with `git am`.

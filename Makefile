@@ -1,4 +1,4 @@
-.PHONY: all configure test setup compiler check-patches test-tooling test-compiler bench
+.PHONY: all configure test setup compiler test-compiler bench
 
 all: configure
 
@@ -14,12 +14,6 @@ setup:
 
 compiler:
 	./scripts/build-llvm.sh
-
-check-patches:
-	python3 scripts/llvm.py check
-
-test-tooling:
-	python3 -m unittest discover -s tests/tooling -v
 
 test-compiler:
 	python3 tests/compiler.py

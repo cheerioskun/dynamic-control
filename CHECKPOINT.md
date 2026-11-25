@@ -71,15 +71,13 @@ make test                 # runtime and handwritten dispatcher
 make test-compiler        # actual compiler: IR, O0/O2, flag off/on, execution
 python3 tests/compiler.py --lto full  # same fixture, full LTO
 python3 tests/compiler.py --lto thin  # same fixture, ThinLTO
-make check-patches       # patches reproduce the compiler source tree
 make bench               # build and measure all three paths
 ```
 
 `tests/smoke.cc` checks direct/indirect calls, recursion, two module tables,
 argument/return forwarding, toggling, and release after disable. These checks
 and inspection of the final assembly establish that dispatch and hooks survive
-optimization. Patch tooling follows LDB; [development commands](docs/development.md)
-cover it separately from the runtime.
+optimization. See [development](docs/development.md) for building and editing the compiler.
 
 ## Results
 
